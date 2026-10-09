@@ -23,13 +23,32 @@ namespace BlueCafe
         bool needsRender = true;
         RenderTexture currentTexture;
         GUIStyle viewportCaption;
+        CatalogDrag catalogDrag;
+        Label dragHint;
         [MenuItem("Window/BlueCafe/Designer")]
         public static void Open() { var w = GetWindow<CafeDesignerWindow>(); w.titleContent = new GUIContent("BlueCafe"); w.minSize = new Vector2(880, 560); }
         void OnEnable() { selected = null; armed = null; moving = false; needsRender = true; CafeApi.Changed += Changed; }
-        void OnDisable() { CafeApi.Changed -= Changed; preview?.Dispose(); preview = null; }
+        void OnDisable() { CafeApi.Changed -= Changed; CancelGesture(true, false); preview?.Dispose(); preview = null; currentTexture = null; }
+        void OnLostFocus()
+        {
+            // Click-to-place is a pending choice, not a held-pointer gesture.
+            if (!moving && catalogDrag == null) return;
+            CancelGesture(false, true); RefreshSelection(); Dirty();
+        }
+        void CancelGesture(bool clearSelection = false, bool restorePreview = true)
+        {
+            catalogDrag?.Cancel();
+            bool restore = moving && restorePreview;
+            moving = false; armed = null; moveStart = default; moveCandidate = default;
+            if (clearSelection) selected = null;
+            if (restore && preview != null) preview.Rebuild(CafeApi.Layout);
+        }
         public void CreateGUI()
         {
+            CancelGesture(true, false);
             rootVisualElement.Clear();
+            rootVisualElement.UnregisterCallback<KeyDownEvent>(CatalogEscape, TrickleDown.TrickleDown);
+            rootVisualElement.RegisterCallback<KeyDownEvent>(CatalogEscape, TrickleDown.TrickleDown);
             var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/BlueCafe/Editor/CafeDesigner.uss"); if (sheet) rootVisualElement.styleSheets.Add(sheet);
             rootVisualElement.AddToClassList("designer");
             var header = Row("header", rootVisualElement); AddLabel(header, "BLUE CAFE", "brand"); AddLabel(header, "A room to make your own", "subtitle");
@@ -38,7 +57,7 @@ namespace BlueCafe
             examples.AddToClassList("examples"); examples.RegisterValueChangedCallback(e => {
                 if (examples.index == 0) return;
                 var file = examples.index == 1 ? "momo-friends" : "abydos-classroom";
-                Run(() => { var path = "evidence/references/layouts/" + file + ".layout.json"; if (!File.Exists(path)) throw new CafeValidationException("EXAMPLE_UNAVAILABLE", path); CafeApi.Load(path); selected = null; armed = null; preview.FrameRoom(); RefreshSelection(); Message("Loaded " + e.newValue + ". Arrangement inferred from the source preview."); });
+                Run(() => { var path = "evidence/references/layouts/" + file + ".layout.json"; if (!File.Exists(path)) throw new CafeValidationException("EXAMPLE_UNAVAILABLE", path); CancelGesture(true, false); CafeApi.Load(path); preview.FrameRoom(); RefreshSelection(); Message("Loaded " + e.newValue + ". Arrangement inferred from the source preview."); });
                 examples.SetValueWithoutNotify("Load an example");
             }); header.Add(examples);
             Button(header, "Open", () => { var p = EditorUtility.OpenFilePanel("Open cafe layout", "", "json"); if (p.Length > 0) CafeApi.Load(p); });
@@ -51,6 +70,11 @@ namespace BlueCafe
             var grid = new Toggle("Grid"); grid.RegisterValueChangedCallback(e => { showGrid = e.newValue; Dirty(); }); toolbar.Add(grid);
             AddLabel(toolbar, "Scroll to zoom · Right-drag to pan", "hint");
             viewport = new IMGUIContainer(DrawViewport); viewport.AddToClassList("viewport"); viewport.focusable = true; workspace.Add(viewport);
+            // A release over a sibling control may never reach the IMGUI container.
+            // Cancel its provisional move without consuming the sibling's click.
+            workspace.parent.RegisterCallback<PointerUpEvent>(e => {
+                if (e.button == 0 && moving && !viewport.worldBound.Contains(e.position)) { CancelGesture(); Dirty(); }
+            }, TrickleDown.TrickleDown);
             selection = Row("selection", workspace);
             var room = new Foldout { text = "Room dimensions & placement grid", value = false }; room.AddToClassList("room-settings"); workspace.Add(room);
             var fields = Row("room-fields", room); var r = CafeApi.Layout.room;
@@ -66,6 +90,11 @@ namespace BlueCafe
             var scroll = new ScrollView(ScrollViewMode.Vertical); catalogPanel.Add(scroll); scroll.AddToClassList("viewport"); cards = Row("cards", scroll);
             Button(catalogPanel, "Reload asset catalog", () => { CafeApi.ReloadCatalog(); CreateGUI(); });
             status = new Label("Drag furniture into the room, or click a card then click the floor."); status.AddToClassList("status"); rootVisualElement.Add(status);
+            dragHint = new Label { pickingMode = PickingMode.Ignore };
+            dragHint.style.position = Position.Absolute; dragHint.style.display = DisplayStyle.None;
+            dragHint.style.backgroundColor = new Color(.12f, .25f, .30f, .94f); dragHint.style.color = Color.white;
+            dragHint.style.paddingLeft = 10; dragHint.style.paddingRight = 10; dragHint.style.paddingTop = 6; dragHint.style.paddingBottom = 6;
+            rootVisualElement.Add(dragHint);
             preview?.Dispose(); preview = new CafePreview(); preview.Rebuild(CafeApi.Layout); preview.FrameRoom();
             RefreshCards(); RefreshSelection(); Dirty();
         }
@@ -73,6 +102,7 @@ namespace BlueCafe
         {
             var floor = CafeApi.Find("1"); var wall = CafeApi.Find("2");
             if (!floor.available || !wall.available) throw new CafeValidationException("ASSET_UNAVAILABLE", "The original default floor and wall models are required for a new canvas.");
+            CancelGesture(true, false);
             int group = Undo.GetCurrentGroup() + 1;
             CafeApi.NewLayout(width: 12, depth: 12); CafeApi.Place("1", 0, 0); CafeApi.Place("2", 0, 0);
             Undo.CollapseUndoOperations(group);
@@ -88,6 +118,7 @@ namespace BlueCafe
         void Changed()
         {
             if (preview == null) return;
+            CancelGesture(false, false);
             var room = CafeApi.Layout.room;
             roomWidth?.SetValueWithoutNotify(room.width); roomDepth?.SetValueWithoutNotify(room.depth); roomHeight?.SetValueWithoutNotify(room.wallHeight); roomGrid?.SetValueWithoutNotify(room.grid);
             preview.Rebuild(CafeApi.Layout); if (!CafeApi.Layout.instances.Any(i => i.instanceId == selected)) selected = null;
@@ -96,6 +127,7 @@ namespace BlueCafe
         void RefreshCards()
         {
             if (cards == null || theme == null || category == null) return;
+            catalogDrag?.Cancel();
             cards.Clear(); var items = CafeApi.Search(search.value, category.index == 0 ? "" : category.value, theme.index == 0 ? "" : theme.value).OrderByDescending(i => i.available).ThenBy(i => i.name).ToArray();
             ((Label)count).text = items.Length + " items · " + items.Count(i => i.available) + " models available";
             foreach (var item in items.Take(limit))
@@ -103,7 +135,7 @@ namespace BlueCafe
                 var card = Row("card", cards); card.EnableInClassList("unavailable", !item.available); card.tooltip = item.name + " · " + item.id + "\n" + (item.available ? "Drag to place · " + item.placement : "Model unavailable; retained in catalog");
                 var image = new Image { image = AssetDatabase.LoadAssetAtPath<Texture2D>(item.thumbnailPath ?? ""), scaleMode = ScaleMode.ScaleToFit }; image.AddToClassList("thumb"); card.Add(image);
                 AddLabel(card, item.name ?? item.id, "item-name"); AddLabel(card, item.available ? (item.placement ?? "floor").ToUpperInvariant() : "MODEL UNAVAILABLE", "item-kind");
-                card.AddManipulator(new CatalogDrag(item, () => { if (item.available) { armed = item.id; Message("Placing " + item.name + ". Click the room. Escape cancels."); } else Message("Original model unavailable for " + item.name, true); }));
+                card.AddManipulator(new CatalogDrag(this, item, () => { if (item.available) { CancelGesture(); armed = item.id; Dirty(); Message("Placing " + item.name + ". Click the room. Escape cancels."); } else Message("Original model unavailable for " + item.name, true); }));
             }
             if (items.Length > limit) Button(cards, "Show more", () => { limit += 120; RefreshCards(); });
         }
@@ -134,12 +166,11 @@ namespace BlueCafe
                 if (!string.IsNullOrEmpty(armed)) GUI.Label(new Rect(e.mousePosition.x + 18, e.mousePosition.y + 12, 300, 25), "Place " + CafeApi.Find(armed).name, EditorStyles.helpBox);
             }
             var local = e.mousePosition - rect.position;
-            if (e.type == EventType.DragUpdated && rect.Contains(e.mousePosition) && DragAndDrop.GetGenericData("BlueCafe.Item") is string) { DragAndDrop.visualMode = DragAndDropVisualMode.Copy; e.Use(); }
-            if (e.type == EventType.DragPerform && rect.Contains(e.mousePosition) && DragAndDrop.GetGenericData("BlueCafe.Item") is string id)
+            if (!rect.Contains(e.mousePosition))
             {
-                DragAndDrop.AcceptDrag(); var p = preview.FloorPoint(local, rect); Run(() => { selected = CafeApi.Place(id, p.x, p.z); armed = null; RefreshSelection(); }); DragAndDrop.SetGenericData("BlueCafe.Item", null); e.Use();
+                if (e.type == EventType.MouseUp && e.button == 0 && moving) { CancelGesture(); Dirty(); }
+                return;
             }
-            if (!rect.Contains(e.mousePosition) && !moving) return;
             if (e.type == EventType.ScrollWheel) { preview.Zoom(e.delta.y); Dirty(); e.Use(); }
             if (e.type == EventType.MouseDown)
             {
@@ -164,7 +195,7 @@ namespace BlueCafe
             if (e.type == EventType.MouseUp && moving) { moving = false; Run(() => CafeApi.Move(selected, moveCandidate.x, moveCandidate.z, moveCandidate.y)); e.Use(); }
             if (e.type == EventType.KeyDown)
             {
-                if (e.keyCode == KeyCode.Escape) { armed = null; moving = false; preview.Rebuild(CafeApi.Layout); selected = null; RefreshSelection(); Dirty(); e.Use(); }
+                if (e.keyCode == KeyCode.Escape) { CancelGesture(true); RefreshSelection(); Dirty(); e.Use(); }
                 else if (e.keyCode == KeyCode.R && !string.IsNullOrEmpty(selected)) { Run(() => CafeApi.Rotate(selected)); e.Use(); }
                 else if ((e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace) && !string.IsNullOrEmpty(selected)) { Run(() => CafeApi.Delete(selected)); e.Use(); }
                 else if (e.control && e.keyCode == KeyCode.D && !string.IsNullOrEmpty(selected)) { Run(() => { selected = CafeApi.Duplicate(selected); RefreshSelection(); }); e.Use(); }
@@ -185,15 +216,75 @@ namespace BlueCafe
             var points = new[] { new Vector3(b.min.x,b.min.y,b.min.z), new Vector3(b.max.x,b.min.y,b.min.z), new Vector3(b.max.x,b.min.y,b.max.z), new Vector3(b.min.x,b.min.y,b.max.z), new Vector3(b.min.x,b.min.y,b.min.z) };
             Handles.BeginGUI(); Handles.color = new Color(.12f,.72f,.94f); Handles.DrawAAPolyLine(3, points.Select(p => Screen(p, rect)).ToArray()); Handles.EndGUI();
         }
+        void CatalogEscape(KeyDownEvent e)
+        {
+            if (e.keyCode != KeyCode.Escape || catalogDrag == null) return;
+            CancelGesture(); Message("Placement cancelled."); Dirty(); e.StopPropagation();
+        }
+        void DropCatalogItem(CafeItem item, Vector2 panelPosition)
+        {
+            var bounds = viewport.worldBound;
+            if (!bounds.Contains(panelPosition)) { Message("Placement cancelled. Release inside the room to place furniture."); return; }
+            var point = preview.FloorPoint(panelPosition - bounds.position, new Rect(Vector2.zero, bounds.size));
+            Run(() => { selected = CafeApi.Place(item.id, point.x, point.z); RefreshSelection(); Message("Placed " + item.name + "."); });
+        }
         class CatalogDrag : PointerManipulator
         {
-            readonly CafeItem item; readonly Action click; Vector2 start; bool held;
-            public CatalogDrag(CafeItem item, Action click) { this.item = item; this.click = click; }
-            protected override void RegisterCallbacksOnTarget() { target.RegisterCallback<PointerDownEvent>(Down); target.RegisterCallback<PointerMoveEvent>(Move); target.RegisterCallback<PointerUpEvent>(Up); }
-            protected override void UnregisterCallbacksFromTarget() { target.UnregisterCallback<PointerDownEvent>(Down); target.UnregisterCallback<PointerMoveEvent>(Move); target.UnregisterCallback<PointerUpEvent>(Up); }
-            void Down(PointerDownEvent e) { if (e.button != 0) return; start = e.position; held = true; target.CapturePointer(e.pointerId); e.StopPropagation(); }
-            void Move(PointerMoveEvent e) { if (!held || !item.available || Vector2.Distance(start, e.position) < 5) return; held = false; target.ReleasePointer(e.pointerId); DragAndDrop.PrepareStartDrag(); DragAndDrop.SetGenericData("BlueCafe.Item", item.id); DragAndDrop.StartDrag(item.name); }
-            void Up(PointerUpEvent e) { if (!held) return; held = false; target.ReleasePointer(e.pointerId); click(); e.StopPropagation(); }
+            readonly CafeDesignerWindow owner; readonly CafeItem item; readonly Action click;
+            Vector2 start; bool held, dragging; int pointerId = -1;
+            public CatalogDrag(CafeDesignerWindow owner, CafeItem item, Action click) { this.owner = owner; this.item = item; this.click = click; }
+            protected override void RegisterCallbacksOnTarget()
+            {
+                target.RegisterCallback<PointerDownEvent>(Down); target.RegisterCallback<PointerMoveEvent>(Move); target.RegisterCallback<PointerUpEvent>(Up);
+                target.RegisterCallback<PointerCaptureOutEvent>(CaptureLost); target.RegisterCallback<PointerCancelEvent>(PointerCancelled); target.RegisterCallback<DetachFromPanelEvent>(Detached);
+            }
+            protected override void UnregisterCallbacksFromTarget()
+            {
+                Cancel();
+                target.UnregisterCallback<PointerDownEvent>(Down); target.UnregisterCallback<PointerMoveEvent>(Move); target.UnregisterCallback<PointerUpEvent>(Up);
+                target.UnregisterCallback<PointerCaptureOutEvent>(CaptureLost); target.UnregisterCallback<PointerCancelEvent>(PointerCancelled); target.UnregisterCallback<DetachFromPanelEvent>(Detached);
+            }
+            public void Cancel()
+            {
+                int captured = pointerId; held = false; dragging = false; pointerId = -1;
+                if (owner.catalogDrag == this) owner.catalogDrag = null;
+                if (owner.dragHint != null) owner.dragHint.style.display = DisplayStyle.None;
+                // Clear state before releasing: our own CaptureOut is not another drop.
+                if (captured >= 0 && target.HasPointerCapture(captured)) target.ReleasePointer(captured);
+            }
+            void Down(PointerDownEvent e)
+            {
+                if (e.button != 0) return;
+                owner.CancelGesture(); owner.catalogDrag = this;
+                start = e.position; held = true; dragging = false; pointerId = e.pointerId;
+                target.CapturePointer(pointerId); e.StopPropagation();
+            }
+            void Move(PointerMoveEvent e)
+            {
+                if (!held || e.pointerId != pointerId) return;
+                if ((e.pressedButtons & 1) == 0) { Cancel(); return; }
+                if (!dragging && Vector2.Distance(start, e.position) >= 5) dragging = true;
+                if (dragging && owner.dragHint != null)
+                {
+                    bool inside = owner.viewport.worldBound.Contains(e.position);
+                    owner.dragHint.text = item.available ? (inside ? "Release to place " : "Drag into the room: ") + item.name : "Original model unavailable";
+                    owner.dragHint.style.left = e.position.x + 14; owner.dragHint.style.top = e.position.y + 12;
+                    owner.dragHint.style.display = DisplayStyle.Flex;
+                }
+                e.StopPropagation();
+            }
+            void Up(PointerUpEvent e)
+            {
+                if (!held || e.pointerId != pointerId || e.button != 0) return;
+                bool drop = dragging; var position = (Vector2)e.position;
+                Cancel();
+                if (drop) { if (item.available) owner.DropCatalogItem(item, position); }
+                else if (target.worldBound.Contains(position)) click();
+                e.StopPropagation();
+            }
+            void CaptureLost(PointerCaptureOutEvent e) { if (held && e.pointerId == pointerId) Cancel(); }
+            void PointerCancelled(PointerCancelEvent e) { if (e.pointerId == pointerId) Cancel(); }
+            void Detached(DetachFromPanelEvent e) { Cancel(); }
         }
     }
 }
