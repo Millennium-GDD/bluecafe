@@ -1,0 +1,36 @@
+.designer { flex-grow: 1; background-color: #192933; color: #e5eef3; }
+.header { flex-direction: row; align-items: center; height: 58px; padding-left: 20px; padding-right: 16px; background-color: #15242d; }
+.brand { font-size: 20px; -unity-font-style: bold; margin-right: 20px; color: #e7f7fc; }
+.subtitle { color: #a3b7c2; font-size: 11px; flex-grow: 1; }
+.body { flex-direction: row; flex-grow: 1; }
+.workspace { flex-grow: 1; flex-basis: 0; min-width: 300px; }
+.viewport { flex-grow: 1; }
+.catalog { width: 302px; flex-shrink: 0; background-color: #22333d; padding: 14px; }
+.catalog-title { font-size: 17px; -unity-font-style: bold; margin-bottom: 12px; }
+.search { margin-bottom: 8px; }
+.filters { margin-bottom: 5px; }
+.catalog-count { color: #a7becb; margin-top: 8px; margin-bottom: 12px; font-size: 11px; }
+.cards { flex-direction: row; flex-wrap: wrap; }
+.card { width: 110px; height: 150px; margin: 0 6px 9px 0; border-radius: 5px; background-color: #304550; padding: 5px; border-width: 1px; border-color: #3e5360; }
+.card:hover { background-color: #3b5969; border-color: #79d2e7; }
+.card.unavailable { opacity: 0.48; }
+.thumb { height: 84px; flex-shrink: 0; margin-bottom: 6px; }
+.item-name { white-space: normal; overflow: hidden; flex-shrink: 0; font-size: 11px; height: 32px; color: #e6eff4; }
+.item-kind { font-size: 9px; color: #a8c8d5; }
+.toolbar { flex-direction: row; align-items: center; min-height: 38px; background-color: #253b47; padding-left: 12px; padding-right: 12px; }
+.toolbar Button, .header Button { margin-right: 5px; min-height: 25px; padding-left: 10px; padding-right: 10px; }
+.toolbar .hint { flex-grow: 1; color: #aac3cf; font-size: 11px; }
+.selection { min-height: 65px; background-color: #20333f; padding: 10px 14px; }
+.selection-title { -unity-font-style: bold; margin-bottom: 7px; }
+.selection-actions { flex-direction: row; align-items: center; }
+.coordinate { width: 92px; margin-right: 8px; }
+.coordinate > Label { min-width: 15px; }
+.status { background-color: #15242d; color: #b8cdd7; padding: 8px 14px; font-size: 11px; min-height: 30px; white-space: normal; }
+.status.error { color: #ffd6a1; }
+.room-settings { padding: 8px; background-color: #253b47; }
+.room-fields { flex-direction: row; }
+.room-field { width: 125px; margin-right: 12px; }
+.room-field > Label { min-width: 53px; }
+
+.search > Label { min-width: 45px; }
+.examples { width: 160px; margin-right: 8px; }
