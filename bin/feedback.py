@@ -12,10 +12,49 @@ from datetime import datetime, timezone
 PROJECT = Path(__file__).resolve().parents[1]
 
 
+def run_command(command):
+    try:
+        process = subprocess.run(command, cwd=PROJECT, text=True, capture_output=True, timeout=55)
+        return process.stdout, process.stderr, process.returncode
+    except FileNotFoundError:
+        return json.dumps({"success": False, "error": "Unity CLI is required on PATH; see docs/DEVELOPMENT.md."}), "", 127
+    except subprocess.TimeoutExpired as error:
+        stdout, stderr = error.stdout or "", error.stderr or ""
+        if isinstance(stdout, bytes): stdout = stdout.decode(errors="replace")
+        if isinstance(stderr, bytes): stderr = stderr.decode(errors="replace")
+        return stdout, stderr, 124
+
+
+def parse_response(stdout):
+    try:
+        result = json.loads(stdout)
+        return result if isinstance(result, dict) else {"success": False, "error": "Invalid JSON response"}
+    except ValueError:
+        return {"success": False, "error": "No JSON response"}
+
+
+def compilation_ready(result, returncode):
+    """Fail closed unless the explicit project's compilation completed cleanly."""
+    nested = result.get("data")
+    state = nested.get("result") if isinstance(nested, dict) else None
+    if returncode != 0 or result.get("success") is not True or not isinstance(state, dict):
+        return False
+    if state.get("status") != "completed" or state.get("compilationFailed") is not False:
+        return False
+    def unhealthy(value):
+        if isinstance(value, dict):
+            return any((key in ("failed", "compilationFailed", "isCompiling", "compiling") and bool(item)) or
+                       (key == "success" and item is False) or
+                       (key == "errors" and bool(item)) or unhealthy(item)
+                       for key, item in value.items())
+        return isinstance(value, list) and any(unhealthy(item) for item in value)
+    return not unhealthy(result)
+
+
 def fingerprint():
     digest = hashlib.sha256()
     paths = []
-    for folder in ("Assets/BlueCafe/Editor", "Assets/BlueCafe/Shaders", "Assets/BlueCafe/Tests", "Packages", "ProjectSettings", "bin", "tools", "evidence/references/layouts"):
+    for folder in ("Assets/BlueCafe/Core", "Assets/BlueCafe/Infrastructure", "Assets/BlueCafe/Unity", "Assets/BlueCafe/App", "Assets/BlueCafe/Agent", "Assets/BlueCafe/Editor", "Assets/BlueCafe/Shaders", "Assets/BlueCafe/Tests", "Packages", "ProjectSettings", "bin", "tools", "evidence/references/layouts", "docs/reconstruction"):
         root = PROJECT / folder
         if root.exists():
             paths.extend(p for p in root.rglob("*") if p.is_file() and p.suffix != ".pyc")
@@ -53,30 +92,41 @@ def main():
     evidence.mkdir(parents=True)
     before = fingerprint()
     start = time.monotonic()
-    try:
-        process = subprocess.run(command, cwd=PROJECT, text=True, capture_output=True, timeout=55)
-        stdout, stderr, returncode = process.stdout, process.stderr, process.returncode
-    except subprocess.TimeoutExpired as error:
-        stdout = error.stdout or ""
-        stderr = error.stderr or ""
-        if isinstance(stdout, bytes): stdout = stdout.decode(errors="replace")
-        if isinstance(stderr, bytes): stderr = stderr.decode(errors="replace")
-        returncode = 124
+    preflight = None
+    executed = True
+    if args.action in ("eval", "tests"):
+        preflight_command = ["unity", "command", "recompile_status", "--project-path", str(PROJECT),
+                             "--caller", "plugin", "--skill", "unity-cli", "--format", "json", "--timeout", "45"]
+        raw, error, code = run_command(preflight_command)
+        (evidence / "preflight-stdout.json").write_text(raw)
+        (evidence / "preflight-stderr.log").write_text(error)
+        response = parse_response(raw)
+        ready = compilation_ready(response, code)
+        preflight = {"command": preflight_command, "exitCode": code, "success": ready, "response": response}
+        if not ready:
+            executed = False
+            stdout = json.dumps({"success": False, "error": "Compilation preflight rejected action; recompile and wait for clean completion.",
+                                 "code": "COMPILATION_NOT_READY"})
+            stderr, returncode = "", 1
+    if executed:
+        stdout, stderr, returncode = run_command(command)
     (evidence / "stdout.json").write_text(stdout)
     (evidence / "stderr.log").write_text(stderr)
-    try:
-        result = json.loads(stdout)
-    except ValueError:
-        result = {"success": False, "error": "No JSON response"}
+    result = parse_response(stdout)
     nested = result.get("data", {}) or {}
     evaluated = nested.get("result", {})
     ok = returncode == 0 and result.get("success", False)
     if isinstance(evaluated, dict) and evaluated.get("success") is False:
         ok = False
+    if args.action == "test-status" and isinstance(evaluated, dict):
+        summary = evaluated.get("summary", evaluated.get("Summary", {}))
+        if summary.get("failed", summary.get("Failed", 0)) > 0:
+            ok = False
     after = fingerprint()
     report = {"action": args.action, "success": ok, "exitCode": returncode,
               "elapsedSeconds": round(time.monotonic() - start, 3),
               "sourceFingerprint": before, "sourceUnchanged": before == after,
+              "actionExecuted": executed, "preflight": preflight,
               "evidence": str(evidence)}
     (evidence / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({**report, "response": result}, indent=2))

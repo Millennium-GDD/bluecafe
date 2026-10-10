@@ -1,0 +1,11 @@
+* text=auto
+*.cs text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.uss text eol=lf
+*.shader text eol=lf
+# Unity serializes empty YAML values with a trailing space.
+*.meta whitespace=-blank-at-eol
+*.unity whitespace=-blank-at-eol
+*.asset whitespace=-blank-at-eol
+*.ttf binary

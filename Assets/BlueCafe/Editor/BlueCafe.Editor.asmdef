@@ -1,1 +1,1 @@
-{"name":"BlueCafe.Editor","rootNamespace":"BlueCafe","includePlatforms":["Editor"],"autoReferenced":true}
+{"name":"BlueCafe.Editor","rootNamespace":"BlueCafe","includePlatforms":["Editor"],"autoReferenced":true,"references":["BlueCafe.Core"]}

@@ -20,11 +20,13 @@ namespace BlueCafe
         readonly List<UnityEngine.Object> transient = new List<UnityEngine.Object>();
         readonly Dictionary<string, GameObject> objects = new Dictionary<string, GameObject>();
         readonly HashSet<GameObject> backgrounds = new HashSet<GameObject>();
+        readonly HashSet<Renderer> framingHelpers = new HashSet<Renderer>();
         readonly Dictionary<string, Mesh> meshes = new Dictionary<string, Mesh>();
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         RenderTexture texture;
         CafeRoom room;
         bool framed;
+        bool frozenCamera;
         public IReadOnlyDictionary<string, GameObject> Objects => objects;
         public CafePreview()
         {
@@ -38,7 +40,7 @@ namespace BlueCafe
         public void Rebuild(CafeLayout layout)
         {
             foreach (var go in objects.Values) if (go) UnityEngine.Object.DestroyImmediate(go);
-            objects.Clear(); backgrounds.Clear(); room = layout.room;
+            objects.Clear(); backgrounds.Clear(); framingHelpers.Clear(); room = layout.room;
             foreach (var instance in layout.instances)
             {
                 var item = CafeApi.Find(instance.furnitureId);
@@ -50,7 +52,13 @@ namespace BlueCafe
                     var anchor = new GameObject("Native pivot offset"); anchor.transform.SetParent(go.transform, false);
                     var children = go.transform.Cast<Transform>().Where(t => t != anchor.transform).ToArray();
                     foreach (var child in children) child.SetParent(anchor.transform, false);
-                    anchor.transform.localPosition = new Vector3(0, -(item.bounds.min[1] + item.bounds.max[1]) / 2, 0);
+                    float centerY = (item.bounds.min[1] + item.bounds.max[1]) / 2;
+                    if (CafeWindowRendering.IsAuditedSurface(item))
+                    {
+                        var frame = go.GetComponentsInChildren<Renderer>().FirstOrDefault(r => CafeWindowRendering.IsFrameRenderer(item,r));
+                        if (frame) centerY = frame.bounds.center.y;
+                    }
+                    anchor.transform.localPosition = new Vector3(0, -centerY, 0);
                 }
                 go.name = item.name + " [" + instance.instanceId + "]";
                 go.transform.localPosition = instance.position; go.transform.localRotation = Quaternion.Euler(0, instance.quarterTurns * 90, 0);
@@ -69,7 +77,7 @@ namespace BlueCafe
             var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             void Include(Vector3 point) { var p = inverse * point; min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
-            var renderers = root.GetComponentsInChildren<Renderer>().Where(r => !backgrounds.Any(b => r.transform.IsChildOf(b.transform))).ToArray();
+            var renderers = root.GetComponentsInChildren<Renderer>().Where(r => !framingHelpers.Contains(r) && !backgrounds.Any(b => r.transform.IsChildOf(b.transform))).ToArray();
             if (renderers.Length == 0)
             {
                 for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++) Include(new Vector3((x - .5f) * room.width, 0, (z - .5f) * room.depth));
@@ -90,7 +98,8 @@ namespace BlueCafe
             foreach (var background in backgrounds)
             {
                 background.transform.SetPositionAndRotation(camera.transform.position + camera.transform.forward * 200, camera.transform.rotation);
-                background.transform.localScale = new Vector3(camera.orthographicSize * camera.aspect * 2, camera.orthographicSize * 2, 1);
+                float verticalSpan = camera.orthographic ? camera.orthographicSize * 2 : 2 * 200 * Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad / 2);
+                background.transform.localScale = new Vector3(verticalSpan * camera.aspect, verticalSpan, 1);
             }
         }
         public void Pan(Vector2 delta)
@@ -108,7 +117,7 @@ namespace BlueCafe
                 texture.Create();
             }
             bool firstRender = camera.targetTexture == null;
-            camera.targetTexture = texture; camera.aspect = (float)width / height; if (firstRender) FrameRoom(); UpdateBackgrounds(); camera.Render(); return texture;
+            camera.targetTexture = texture; camera.aspect = (float)width / height; if (firstRender && !frozenCamera) FrameRoom(); UpdateBackgrounds(); camera.Render(); return texture;
         }
         public Ray ScreenRay(Vector2 local, Rect rect) => camera.ViewportPointToRay(new Vector3(local.x / rect.width, 1 - local.y / rect.height, 0));
         public Vector3 FloorPoint(Vector2 local, Rect rect)
@@ -120,9 +129,16 @@ namespace BlueCafe
             var ray = ScreenRay(point, rect); string selected = null; float nearest = float.MaxValue;
             foreach (var pair in objects.Where(p => !backgrounds.Contains(p.Value)))
             foreach (var renderer in pair.Value.GetComponentsInChildren<Renderer>())
-                if (renderer.bounds.IntersectRay(ray, out float distance) && distance < nearest) { nearest = distance; selected = pair.Key; }
+                if (!framingHelpers.Contains(renderer) && renderer.bounds.IntersectRay(ray, out float distance) && distance < nearest) { nearest = distance; selected = pair.Key; }
             return selected;
         }
+        public Vector3 NativePivotOffsetFor(string id)
+        {
+            if (id == null || !objects.TryGetValue(id, out var go)) return Vector3.zero;
+            var anchor = go.transform.Find("Native pivot offset");
+            return anchor ? anchor.localPosition : Vector3.zero;
+        }
+        public bool IsFramingHelper(Renderer renderer) => framingHelpers.Contains(renderer);
         public Bounds? BoundsFor(string id)
         {
             if (id == null || !objects.TryGetValue(id, out var go)) return null;
@@ -181,14 +197,16 @@ namespace BlueCafe
                     if (!string.IsNullOrEmpty(part.meshJsonPath) && File.Exists(part.meshJsonPath))
                     {
                         child = new GameObject(Path.GetFileNameWithoutExtension(part.meshJsonPath)); child.AddComponent<MeshFilter>().sharedMesh = LoadMesh(part.meshJsonPath);
-                        child.AddComponent<MeshRenderer>().sharedMaterials = (part.materials ?? Array.Empty<CafeMaterial>()).Select(LoadMaterial).ToArray();
+                        child.AddComponent<MeshRenderer>().sharedMaterials = (part.materials ?? Array.Empty<CafeMaterial>()).Select(spec => LoadMaterial(spec, item)).ToArray();
                     }
                     else
                     {
                         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(part.modelPath ?? "");
                         if (!prefab) continue; child = UnityEngine.Object.Instantiate(prefab);
-                        ApplyMaterials(child, part.materials);
+                        ApplyMaterials(child, part.materials, item);
                     }
+                    if (CafeWindowRendering.IsFramingHelper(item, part))
+                        foreach (var renderer in child.GetComponentsInChildren<Renderer>()) framingHelpers.Add(renderer);
                     child.transform.SetParent(result.transform, false);
                     child.transform.localPosition = V3(part.position, Vector3.zero);
                     child.transform.localRotation = part.rotation != null && part.rotation.Length == 4 ? new Quaternion(part.rotation[0], part.rotation[1], part.rotation[2], part.rotation[3]) : Quaternion.identity;
@@ -203,14 +221,14 @@ namespace BlueCafe
             return result;
         }
         static Vector3 V3(float[] p, Vector3 fallback) => p != null && p.Length >= 3 ? new Vector3(p[0], p[1], p[2]) : fallback;
-        void ApplyMaterials(GameObject go, CafeMaterial[] specs)
+        void ApplyMaterials(GameObject go, CafeMaterial[] specs, CafeItem item)
         {
             if (specs == null || specs.Length == 0) return;
-            foreach (var renderer in go.GetComponentsInChildren<Renderer>()) renderer.sharedMaterials = specs.Select(LoadMaterial).ToArray();
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>()) renderer.sharedMaterials = specs.Select(spec => LoadMaterial(spec, item)).ToArray();
         }
-        Material LoadMaterial(CafeMaterial spec)
+        Material LoadMaterial(CafeMaterial spec, CafeItem item)
         {
-            var key = JsonUtility.ToJson(spec); if (materials.TryGetValue(key, out var existing)) return existing;
+            var key = (CafeWindowRendering.IsAuditedSurface(item) ? "surface:" + item.id + ":" : item.placement == "wallpaper" ? "wallpaper:" : "default:") + JsonUtility.ToJson(spec); if (materials.TryGetValue(key, out var existing)) return existing;
             var shader = Shader.Find("BlueCafe/BakedTexture") ?? Shader.Find("Unlit/Texture");
             var material = new Material(shader) { name = spec.name ?? "Cafe material" };
             if (!string.IsNullOrEmpty(spec.texturePath)) material.mainTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(spec.texturePath);
@@ -232,6 +250,7 @@ namespace BlueCafe
                 float peak = Mathf.Max(1, Mathf.Max(spec.color[0], Mathf.Max(spec.color[1], spec.color[2])));
                 material.color = new Color(spec.color[0] / peak, spec.color[1] / peak, spec.color[2] / peak, spec.color[3]);
             }
+            CafeWindowRendering.Apply(item, spec, material);
             transient.Add(material); materials[key] = material; return material;
         }
         Mesh LoadMesh(string path)
@@ -244,6 +263,20 @@ namespace BlueCafe
             if (data.uv != null && data.uv.Length == vertices.Length * 2) { var uv = new Vector2[vertices.Length]; for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(data.uv[i * 2], data.uv[i * 2 + 1]); mesh.uv = uv; }
             mesh.subMeshCount = data.submeshes.Length; for (int i = 0; i < data.submeshes.Length; i++) mesh.SetTriangles(data.submeshes[i].triangles, i);
             mesh.RecalculateBounds(); transient.Add(mesh); meshes[path] = mesh; return mesh;
+        }
+        // Explicit profiles survive first render and rebuild; normal room-fit capture is unchanged.
+        public void ApplyCameraProfile(CafeCameraProfile profile)
+        {
+            CafeReconstruction.ValidateCameraProfile(profile);
+            frozenCamera = true; framed = true;
+            camera.aspect = (float)profile.width / profile.height;
+            camera.orthographic = profile.projection == "orthographic";
+            camera.orthographicSize = profile.orthographicSize;
+            camera.fieldOfView = profile.fieldOfView;
+            camera.nearClipPlane = profile.nearClip; camera.farClipPlane = profile.farClip;
+            var rotation = Quaternion.Euler(profile.elevation, profile.yaw, 0);
+            camera.transform.SetPositionAndRotation(profile.target - rotation * Vector3.forward * profile.distance, rotation);
+            UpdateBackgrounds();
         }
         public string Capture(string path, int width, int height)
         {

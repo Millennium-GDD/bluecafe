@@ -1,0 +1,1 @@
+{"name":"BlueCafe.Infrastructure.Tests","rootNamespace":"BlueCafe.Infrastructure.Tests","references":["BlueCafe.Core","BlueCafe.Infrastructure"],"includePlatforms":["Editor"],"optionalUnityReferences":["TestAssemblies"],"autoReferenced":false}

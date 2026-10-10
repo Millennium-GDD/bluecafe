@@ -1,0 +1,86 @@
+.build-body { min-height: 0; }
+.build-catalog { width: 306px; padding: 20px 18px 12px; background-color: #f8fcff; }
+.build-catalog .heading { margin-bottom: 14px; }
+.build-segments { height: 40px; flex-direction: row; border-radius: 7px; background-color: #eaf2f9; margin-bottom: 13px; flex-shrink: 0; }
+.build-segments > Button { flex-grow: 1; margin: 0; padding: 7px 9px; border-width: 0; background-color: transparent; font-size: 14px; }
+.build-segments > Button.active { color: white; background-color: #248bff; }
+.build-cafe-toggle { flex-direction: row; align-items: center; margin: 2px 0 12px; height: 26px; flex-shrink: 0; }
+.build-cafe-toggle > Label { flex-grow: 1; }
+.build-cafe-toggle > Toggle { margin: 0; }
+.build-cafe-toggle .unity-toggle__checkmark { width: 43px; height: 24px; border-width: 0; border-radius: 14px; background-color: #bbcadd; background-image: none; margin: 0; padding: 3px; align-items: flex-start; }
+.build-switch-knob { width: 18px; height: 18px; border-radius: 10px; background-color: white; }
+.build-cafe-toggle .build-switch-on .unity-toggle__checkmark { background-color: #248bff; align-items: flex-end; }
+.build-filter-row { flex-direction: row; margin-top: 12px; flex-shrink: 0; }
+.build-filter { flex-grow: 1; flex-basis: 0; min-width: 0; }
+.build-filter-first { margin-right: 12px; }
+.build-filter > Label { font-size: 13px; margin-bottom: 2px; }
+.build-filter > PopupField { margin: 0; height: 36px; }
+.build-filter .unity-base-field__input { padding: 7px 9px; }
+.build-catalog-count { height: 22px; font-size: 11px; color: #778aa4; margin-top: 7px; flex-shrink: 0; }
+.build-card-scroll { margin: 0 -4px; }
+.build-catalog .cards, .interior-picker .cards { flex-direction: row; flex-wrap: wrap; }
+.build-catalog .card { width: 48%; height: 134px; margin: 3px 1%; padding: 5px 6px; border-radius: 8px; background-color: #eaf3fa; border-color: transparent; flex-shrink: 0; }
+.build-catalog .card:hover, .interior-picker .card:hover { border-color: #278aff; background-color: #e3f1ff; }
+.build-catalog .card.selected { border-width: 2px; border-color: #248bff; background-color: #e1f0ff; }
+.build-catalog .thumb { width: 100%; height: 74px; flex-shrink: 0; }
+.build-catalog .card-name { font-size: 12px; white-space: normal; -unity-text-align: middle-center; height: 46px; max-height: 46px; text-overflow: clip; margin-top: 1px; }
+.build-catalog .card .error, .build-catalog .card .muted { font-size: 10px; margin: 0; -unity-text-align: middle-center; }
+.build-more { height: 34px; margin: 9px 0 0; flex-shrink: 0; font-size: 12px; }
+.build-more-hidden { display: none; }
+.build-canvas { flex-grow: 1; min-width: 360px; min-height: 0; }
+.build-canvas > .viewport { flex-grow: 1; min-height: 0; }
+.build-overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+.build-floating-tools { position: absolute; top: 10px; left: 0; right: 0; align-items: center; }
+.build-tools { flex-direction: row; align-items: center; height: 52px; padding: 4px 7px; border-width: 1px; border-color: #beddfc; border-radius: 12px; background-color: #f8fcff; }
+.build-tools > Button { margin: 0 2px; padding: 7px 10px; height: 40px; border-width: 0; background-color: transparent; font-size: 13px; }
+.build-tools > Button.active { background-color: #d5eaff; color: #007dff; }
+.build-tools > .icon { width: 37px; padding: 6px; }
+.build-tool-separator { width: 1px; height: 27px; background-color: #d5e2ef; margin: 0 8px; }
+.build-selection-count { min-width: 69px; margin: 0 8px; font-size: 12px; }
+.build-view-tools { position: absolute; left: 0; right: 0; bottom: 14px; flex-direction: row; justify-content: center; align-items: center; }
+.build-view-tools > Button { background-color: #f8fcff; height: 36px; margin: 0 3px; font-size: 12px; }
+.build-view-tools > .icon { width: 35px; }
+.build-inspector { width: 302px; padding: 22px 20px; background-color: #f8fcff; }
+.build-inspector-scroll { flex-grow: 1; }
+.build-inspector .heading { margin-bottom: 15px; font-size: 20px; }
+.build-item-name { font-size: 14px; -unity-font-style: bold; white-space: normal; margin-bottom: 10px; }
+.build-form-label { font-size: 13px; margin: 6px 0 4px; }
+.build-position-row { flex-direction: row; }
+.build-position-row > FloatField { flex-basis: 0; flex-grow: 1; margin: 0; min-width: 0; }
+.build-position-row > .build-position-first { margin-right: 10px; }
+.build-position-row .unity-base-field__label { min-width: 17px; width: 17px; margin-right: 2px; }
+.build-position-row .unity-base-field__input { min-width: 0; padding: 8px 9px; }
+.build-rotation-row { flex-direction: row; align-items: center; }
+.build-rotation-row > PopupField { flex-grow: 1; min-width: 0; margin: 0; }
+.build-rotation-row > .icon { margin: 0 0 0 7px; height: 38px; width: 38px; }
+.build-section { margin-top: 22px; padding-top: 17px; border-top-width: 1px; border-top-color: #d7e4ef; }
+.build-section > .subheading { margin-top: 0; font-size: 19px; }
+.build-room-values { flex-direction: row; margin-bottom: 9px; }
+.build-room-value { flex-grow: 1; flex-basis: 0; }
+.build-room-value > Label { font-size: 13px; }
+.build-room-number { font-size: 16px; margin-top: 4px; }
+.build-resize { margin: 3px 0 0; height: 37px; }
+.build-interior-choice { flex-direction: row; align-items: center; padding: 5px; margin: 5px 0; min-height: 62px; border-width: 1px; border-color: #d8e5f0; border-radius: 7px; background-color: #eef6fc; }
+.build-interior-choice:hover { border-color: #71b5fc; }
+.build-interior-thumb { width: 62px; height: 54px; margin-right: 10px; flex-shrink: 0; }
+.build-interior-copy { flex-grow: 1; min-width: 0; }
+.build-interior-kind { font-size: 12px; color: #657c9a; margin-bottom: 2px; }
+.build-interior-name { font-size: 12px; white-space: normal; }
+.build-interior-browse { margin: 10px 0 0; height: 37px; }
+.build-empty-message { white-space: normal; font-size: 13px; color: #6b7e98; margin: 5px 0; }
+.interior-picker { width: 680px; height: 640px; }
+.interior-picker-controls { flex-direction: row; margin: 10px 0 14px; align-items: center; }
+.interior-picker-controls > PopupField { width: 185px; margin: 0 0 0 12px; }
+.interior-picker-scroll { flex-grow: 1; min-height: 0; }
+.interior-picker .card { width: 31%; height: 145px; margin: 4px 1%; padding: 8px; background-color: #edf5fb; border-width: 1px; border-color: #d9e6f1; border-radius: 8px; }
+.interior-picker .thumb { width: 100%; height: 96px; }
+.interior-picker .card-name { font-size: 12px; height: 32px; white-space: normal; }
+.interior-picker-footer { flex-direction: row; align-items: center; margin-top: 12px; flex-shrink: 0; }
+.interior-picker-footer > Label { flex-grow: 1; font-size: 12px; color: #7186a0; }
+
+.build-catalog .card { height: auto; min-height: 134px; }
+.build-catalog .card-name { height: auto; min-height: 34px; max-height: 160px; white-space: normal; overflow: visible; -unity-text-align: upper-center; }
+
+.interior-picker .card.selected { border-width: 2px; border-color: #248bff; background-color: #e1f0ff; padding: 7px; }
+.interior-picker .card.selected .card-name { color: #087dff; }
+.interior-applied-label { position: absolute; top: 7px; right: 7px; font-size: 10px; padding: 2px 6px; border-radius: 4px; background-color: #248bff; color: white; }

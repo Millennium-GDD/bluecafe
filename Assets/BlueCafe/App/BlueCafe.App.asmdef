@@ -1,0 +1,1 @@
+{"name":"BlueCafe.App","rootNamespace":"BlueCafe.App","references":["BlueCafe.Core","BlueCafe.Infrastructure","BlueCafe.Unity","BlueCafe.Agent"]}

@@ -1,0 +1,772 @@
+{
+  "version": 1,
+  "name": "Abydos Classroom",
+  "room": {
+    "width": 12,
+    "depth": 12,
+    "wallHeight": 4.8,
+    "grid": 0.6
+  },
+  "instances": [
+    {
+      "instanceId": "preset11-11105-01",
+      "furnitureId": "11105",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11204-01",
+      "furnitureId": "11204",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11205-01",
+      "furnitureId": "11205",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -1.2
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11206-01",
+      "furnitureId": "11206",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11207-01",
+      "furnitureId": "11207",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11208-01",
+      "furnitureId": "11208",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": -1.2
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11209-01",
+      "furnitureId": "11209",
+      "position": {
+        "x": 4.8,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11103-01",
+      "furnitureId": "11103",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 3
+      },
+      "quarterTurns": 3
+    },
+    {
+      "instanceId": "preset11-11103-02",
+      "furnitureId": "11103",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 3
+    },
+    {
+      "instanceId": "preset11-11103-03",
+      "furnitureId": "11103",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1101-01",
+      "furnitureId": "1101",
+      "position": {
+        "x": 1.2,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 3
+    },
+    {
+      "instanceId": "preset11-11303-01",
+      "furnitureId": "11303",
+      "position": {
+        "x": 1.2,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11106-01",
+      "furnitureId": "11106",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11106-02",
+      "furnitureId": "11106",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11106-03",
+      "furnitureId": "11106",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11106-04",
+      "furnitureId": "11106",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11106-05",
+      "furnitureId": "11106",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-6-01",
+      "furnitureId": "6",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1103-01",
+      "furnitureId": "1103",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1104-01",
+      "furnitureId": "1104",
+      "position": {
+        "x": -3,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1104-02",
+      "furnitureId": "1104",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset11-11216-01",
+      "furnitureId": "11216",
+      "position": {
+        "x": -4.2,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-01",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": -4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-02",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-03",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-04",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": -1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-05",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11107-06",
+      "furnitureId": "11107",
+      "position": {
+        "x": 3,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11302-01",
+      "furnitureId": "11302",
+      "position": {
+        "x": 3.6,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11302-02",
+      "furnitureId": "11302",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": 4.2
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11211-01",
+      "furnitureId": "11211",
+      "position": {
+        "x": -3,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11211-02",
+      "furnitureId": "11211",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11211-03",
+      "furnitureId": "11211",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11211-04",
+      "furnitureId": "11211",
+      "position": {
+        "x": -1.2,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11202-01",
+      "furnitureId": "11202",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11203-01",
+      "furnitureId": "11203",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11300-01",
+      "furnitureId": "11300",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11210-01",
+      "furnitureId": "11210",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-01",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-02",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-03",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-04",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-05",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11102-06",
+      "furnitureId": "11102",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11101-01",
+      "furnitureId": "11101",
+      "position": {
+        "x": 3.6,
+        "y": 0,
+        "z": -5.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11101-02",
+      "furnitureId": "11101",
+      "position": {
+        "x": 5.4,
+        "y": 0,
+        "z": 5.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11212-01",
+      "furnitureId": "11212",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11212-02",
+      "furnitureId": "11212",
+      "position": {
+        "x": 2.4,
+        "y": 0,
+        "z": 5.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11212-03",
+      "furnitureId": "11212",
+      "position": {
+        "x": 4.8,
+        "y": 0,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11215-01",
+      "furnitureId": "11215",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11215-02",
+      "furnitureId": "11215",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": -0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11304-01",
+      "furnitureId": "11304",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11301-01",
+      "furnitureId": "11301",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": -3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-2101-01",
+      "furnitureId": "2101",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": -4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-2101-02",
+      "furnitureId": "2101",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-2101-03",
+      "furnitureId": "2101",
+      "position": {
+        "x": 4.8,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11306-01",
+      "furnitureId": "11306",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": -3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11306-02",
+      "furnitureId": "11306",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1102-01",
+      "furnitureId": "1102",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": -0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-1102-02",
+      "furnitureId": "1102",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11305-01",
+      "furnitureId": "11305",
+      "position": {
+        "x": -6,
+        "y": 1.8,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11108-01",
+      "furnitureId": "11108",
+      "position": {
+        "x": -4.8,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11108-02",
+      "furnitureId": "11108",
+      "position": {
+        "x": 3.6,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11100-01",
+      "furnitureId": "11100",
+      "position": {
+        "x": -1.2,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11200-01",
+      "furnitureId": "11200",
+      "position": {
+        "x": -3,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11200-02",
+      "furnitureId": "11200",
+      "position": {
+        "x": 4.8,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11201-01",
+      "furnitureId": "11201",
+      "position": {
+        "x": 0.6,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-4-01",
+      "furnitureId": "4",
+      "position": {
+        "x": 2.4,
+        "y": 1.8,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11104-01",
+      "furnitureId": "11104",
+      "position": {
+        "x": -0.6,
+        "y": 3.6,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11213-01",
+      "furnitureId": "11213",
+      "position": {
+        "x": 0.6,
+        "y": 3.6,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11214-01",
+      "furnitureId": "11214",
+      "position": {
+        "x": -2.4,
+        "y": 3.6,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11109-01",
+      "furnitureId": "11109",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11109-02",
+      "furnitureId": "11109",
+      "position": {
+        "x": 3.6,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset11-11217-01",
+      "furnitureId": "11217",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11218-01",
+      "furnitureId": "11218",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset11-11219-01",
+      "furnitureId": "11219",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    }
+  ]
+}

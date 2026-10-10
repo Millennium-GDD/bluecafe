@@ -1,0 +1,7 @@
+{
+  "name": "BlueCafe.Unity.Tests",
+  "references": ["BlueCafe.Core", "BlueCafe.Infrastructure", "BlueCafe.Unity", "BlueCafe.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

@@ -1,0 +1,552 @@
+{
+  "version": 1,
+  "name": "Momo Friends Cafe",
+  "room": {
+    "width": 12,
+    "depth": 12,
+    "wallHeight": 4.8,
+    "grid": 0.6
+  },
+  "instances": [
+    {
+      "instanceId": "preset1-1103-01",
+      "furnitureId": "1103",
+      "position": {
+        "x": -3.6,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-01",
+      "furnitureId": "1104",
+      "position": {
+        "x": -4.2,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-02",
+      "furnitureId": "1104",
+      "position": {
+        "x": -3.0,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1103-02",
+      "furnitureId": "1103",
+      "position": {
+        "x": -3.6,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-03",
+      "furnitureId": "1104",
+      "position": {
+        "x": -4.2,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-04",
+      "furnitureId": "1104",
+      "position": {
+        "x": -3.0,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1103-03",
+      "furnitureId": "1103",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-05",
+      "furnitureId": "1104",
+      "position": {
+        "x": -0.6,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-06",
+      "furnitureId": "1104",
+      "position": {
+        "x": 0.6,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1103-04",
+      "furnitureId": "1103",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-07",
+      "furnitureId": "1104",
+      "position": {
+        "x": -0.6,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1104-08",
+      "furnitureId": "1104",
+      "position": {
+        "x": 0.6,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1100-01",
+      "furnitureId": "1100",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-01",
+      "furnitureId": "1101",
+      "position": {
+        "x": 3.6,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-02",
+      "furnitureId": "1101",
+      "position": {
+        "x": 5.4,
+        "y": 0,
+        "z": -4.2
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1100-02",
+      "furnitureId": "1100",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-03",
+      "furnitureId": "1101",
+      "position": {
+        "x": 3.6,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-04",
+      "furnitureId": "1101",
+      "position": {
+        "x": 5.4,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1100-03",
+      "furnitureId": "1100",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-05",
+      "furnitureId": "1101",
+      "position": {
+        "x": 3.6,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1101-06",
+      "furnitureId": "1101",
+      "position": {
+        "x": 5.4,
+        "y": 0,
+        "z": 0.6
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1103-05",
+      "furnitureId": "1103",
+      "position": {
+        "x": 1.2,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1203-01",
+      "furnitureId": "1203",
+      "position": {
+        "x": 0.6,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1203-02",
+      "furnitureId": "1203",
+      "position": {
+        "x": 1.8,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "preset1-1105-01",
+      "furnitureId": "1105",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1105-02",
+      "furnitureId": "1105",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": 0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1105-03",
+      "furnitureId": "1105",
+      "position": {
+        "x": -1.8,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1301-01",
+      "furnitureId": "1301",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -3.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1301-02",
+      "furnitureId": "1301",
+      "position": {
+        "x": 4.2,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1301-03",
+      "furnitureId": "1301",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1201-01",
+      "furnitureId": "1201",
+      "position": {
+        "x": -3.6,
+        "y": 0,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1202-01",
+      "furnitureId": "1202",
+      "position": {
+        "x": -5.4,
+        "y": 0,
+        "z": -0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1202-02",
+      "furnitureId": "1202",
+      "position": {
+        "x": 2.4,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1302-01",
+      "furnitureId": "1302",
+      "position": {
+        "x": 4.8,
+        "y": 0,
+        "z": 5.4
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1303-01",
+      "furnitureId": "1303",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-3101-01",
+      "furnitureId": "3101",
+      "position": {
+        "x": -4.8,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-3107-01",
+      "furnitureId": "3107",
+      "position": {
+        "x": -3.6,
+        "y": 0,
+        "z": 1.2
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-3104-01",
+      "furnitureId": "3104",
+      "position": {
+        "x": -4.2,
+        "y": 0,
+        "z": 2.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-3104-02",
+      "furnitureId": "3104",
+      "position": {
+        "x": -4.2,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-4106-01",
+      "furnitureId": "4106",
+      "position": {
+        "x": -4.8,
+        "y": 0,
+        "z": -1.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-4106-02",
+      "furnitureId": "4106",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 4.8
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1108-01",
+      "furnitureId": "1108",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": -3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1106-01",
+      "furnitureId": "1106",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 3
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1107-01",
+      "furnitureId": "1107",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 0.6
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1107-02",
+      "furnitureId": "1107",
+      "position": {
+        "x": -6,
+        "y": 2.4,
+        "z": 5.4
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1107-03",
+      "furnitureId": "1107",
+      "position": {
+        "x": 5.4,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-2102-01",
+      "furnitureId": "2102",
+      "position": {
+        "x": -3.6,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-2102-02",
+      "furnitureId": "2102",
+      "position": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1102-01",
+      "furnitureId": "1102",
+      "position": {
+        "x": -3.6,
+        "y": 1.8,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1109-01",
+      "furnitureId": "1109",
+      "position": {
+        "x": 2.4,
+        "y": 1.8,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1204-01",
+      "furnitureId": "1204",
+      "position": {
+        "x": -0.6,
+        "y": 2.4,
+        "z": 6
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "preset1-1200-01",
+      "furnitureId": "1200",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-1300-01",
+      "furnitureId": "1300",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "preset1-6302-01",
+      "furnitureId": "6302",
+      "position": {
+        "x": 0.0,
+        "y": 0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    }
+  ]
+}

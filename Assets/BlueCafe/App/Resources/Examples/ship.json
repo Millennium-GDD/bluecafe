@@ -1,0 +1,552 @@
+{
+  "version": 1,
+  "name": "Transport Ship Cafe",
+  "room": {
+    "width": 12.0,
+    "depth": 12.0,
+    "wallHeight": 4.800000190734863,
+    "grid": 0.6000000238418579
+  },
+  "instances": [
+    {
+      "instanceId": "ac5d42e742394a5fb7f8070fa538e0ed",
+      "furnitureId": "23216",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "6a6cb121c38441818d8c0b8b34d66c92",
+      "furnitureId": "23215",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "05c2c4c2f0dd4f0f9c2ac014f989b767",
+      "furnitureId": "23217",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "3b08a917bfa649a1908dbf00ff675d97",
+      "furnitureId": "210394",
+      "position": {
+        "x": -6.0,
+        "y": 2.4000000953674316,
+        "z": -2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "9ffdafc8d1e54db1a6022e4e7abb1f18",
+      "furnitureId": "23304",
+      "position": {
+        "x": -6.0,
+        "y": 2.4000000953674316,
+        "z": 3.6000001430511475
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "4649c9ab667249e4ad1cb70248126b2e",
+      "furnitureId": "23309",
+      "position": {
+        "x": -3.0,
+        "y": 2.4000000953674316,
+        "z": 6.0
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "622bd9e0eefc4653a278d65582262fce",
+      "furnitureId": "23302",
+      "position": {
+        "x": 3.0,
+        "y": 2.4000000953674316,
+        "z": 6.0
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "3a718e480d7348cbb0ab1a5169d28cc4",
+      "furnitureId": "23212",
+      "position": {
+        "x": -5.400000095367432,
+        "y": 0.0,
+        "z": 1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "d8c7a5dcd5fd4a1987ce63676a89600b",
+      "furnitureId": "11215",
+      "position": {
+        "x": -5.400000095367432,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "4751c16a773e49c7ad2a10402eb13e8f",
+      "furnitureId": "12120",
+      "position": {
+        "x": -6.0,
+        "y": 2.4000000953674316,
+        "z": 1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "a01b13a8511942d19df95f62be6487be",
+      "furnitureId": "12303",
+      "position": {
+        "x": -6.0,
+        "y": 3.6000001430511475,
+        "z": 1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "cddd892657f845c7bdea82b95b3fc09a",
+      "furnitureId": "210391",
+      "position": {
+        "x": -3.6000001430511475,
+        "y": 0.0,
+        "z": -3.6000001430511475
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "350372b8c5a8461b88623d6595529ea7",
+      "furnitureId": "210392",
+      "position": {
+        "x": -3.6000001430511475,
+        "y": 0.0,
+        "z": 3.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "ac512562034249bd81316e720f19466d",
+      "furnitureId": "207304",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "123254a98b2d4f14b893222f8523b5ae",
+      "furnitureId": "207305",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 1.8000000715255737
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "37133afaf5694284997fa8e57902e1bd",
+      "furnitureId": "207302",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "c7d82ad07ca845e4805eb7b825c55c79",
+      "furnitureId": "210302",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 3.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "f073231e0f374906bb1e1a7563b1f6ae",
+      "furnitureId": "207303",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 3.6000001430511475
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "e0c8ac750f1a46b3965994330556512e",
+      "furnitureId": "19122",
+      "position": {
+        "x": -2.4000000953674316,
+        "y": 0.0,
+        "z": -1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "cadddb843aa94dc98b8a3d064f32754d",
+      "furnitureId": "19122",
+      "position": {
+        "x": -2.4000000953674316,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "e611c321b5374910b2045eb3fcb7bd1f",
+      "furnitureId": "19131",
+      "position": {
+        "x": -3.0,
+        "y": 0.0,
+        "z": -1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "2b30d35382374483af9255ba3b040000",
+      "furnitureId": "19131",
+      "position": {
+        "x": -3.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "3f1bb34de35f4cc998fc2257ad5722ce",
+      "furnitureId": "19131",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": -1.2000000476837158
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "44d4ae9e7a20410cb9b3535cc0643878",
+      "furnitureId": "19130",
+      "position": {
+        "x": -1.8000000715255737,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 2
+    },
+    {
+      "instanceId": "e7036b28abd84db386b2fc1380ed0ef0",
+      "furnitureId": "2101",
+      "position": {
+        "x": -3.6000001430511475,
+        "y": 0.0,
+        "z": 0.6000000238418579
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "6afefca207bc4cdf9be9195fc356004a",
+      "furnitureId": "19120",
+      "position": {
+        "x": -1.2000000476837158,
+        "y": 0.0,
+        "z": -5.400000095367432
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "23f1c261ad484a3b97eb2ac46450056f",
+      "furnitureId": "19121",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": -3.6000001430511475
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "3430552884574ebcb6f935a2335adb4e",
+      "furnitureId": "19120",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 4.800000190734863
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "7fe673cf3f8642cd8e718e9b1b230fa8",
+      "furnitureId": "210358",
+      "position": {
+        "x": -0.6000000238418579,
+        "y": 0.0,
+        "z": -4.800000190734863
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "9729ff82028a4821b1ed9522df37c6a5",
+      "furnitureId": "210357",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": -4.800000190734863
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "42365e306d8e4df8b719e49c58e92b6e",
+      "furnitureId": "19110",
+      "position": {
+        "x": 1.2000000476837158,
+        "y": 0.0,
+        "z": -4.800000190734863
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "43fbdd89949240e19e6627f6a81e530b",
+      "furnitureId": "23211",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": -2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "7a66bba66647444096b94b9c0d1037bb",
+      "furnitureId": "23209",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": -1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "ca70f136af114ab6b5e928c799c0c457",
+      "furnitureId": "23210",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "aa2de214338c4937b826ba783d56fdd5",
+      "furnitureId": "23208",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": 1.2000000476837158
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "a180fe7468734fda8a2640ebb97f98fe",
+      "furnitureId": "23306",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": -4.200000286102295
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "039cf515e574468dae3177b5842774cc",
+      "furnitureId": "23206",
+      "position": {
+        "x": 0.6000000238418579,
+        "y": 0.0,
+        "z": 2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "0530e5f9334f416f82e2fbc2f80c2869",
+      "furnitureId": "23207",
+      "position": {
+        "x": 3.0,
+        "y": 0.0,
+        "z": 2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "ebf3399262164e66830cdd203616149d",
+      "furnitureId": "210390",
+      "position": {
+        "x": 2.4000000953674316,
+        "y": 0.0,
+        "z": -4.200000286102295
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "921884387fa34889b7d08b1ff548c17e",
+      "furnitureId": "23305",
+      "position": {
+        "x": 2.4000000953674316,
+        "y": 0.0,
+        "z": 4.200000286102295
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "ec531c39a43d400b97b636e6d1c7700c",
+      "furnitureId": "23201",
+      "position": {
+        "x": -1.2000000476837158,
+        "y": 0.0,
+        "z": 4.800000190734863
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "645e975d77ab4b57b4c6e188050bb8c4",
+      "furnitureId": "19305",
+      "position": {
+        "x": 1.8000000715255737,
+        "y": 0.0,
+        "z": 5.400000095367432
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "c70caab4b6c143c18d082dcf02e6075e",
+      "furnitureId": "8203",
+      "position": {
+        "x": 4.800000190734863,
+        "y": 0.0,
+        "z": -2.4000000953674316
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "26bfc4b1ca7e44aeb642722630bcbda5",
+      "furnitureId": "19200",
+      "position": {
+        "x": 3.0,
+        "y": 0.0,
+        "z": -2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "139ca73413e845deab7f35e02ca218e9",
+      "furnitureId": "8203",
+      "position": {
+        "x": 4.800000190734863,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "9083a2bb53a8433fb9cd3d5ab27f71e1",
+      "furnitureId": "19200",
+      "position": {
+        "x": 3.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "402ef8f0ecce43e1990a4be83fd383e2",
+      "furnitureId": "8203",
+      "position": {
+        "x": 4.800000190734863,
+        "y": 0.0,
+        "z": 2.4000000953674316
+      },
+      "quarterTurns": 1
+    },
+    {
+      "instanceId": "468950fc39d84164ae96388d5ac8b513",
+      "furnitureId": "19200",
+      "position": {
+        "x": 3.0,
+        "y": 0.0,
+        "z": 2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "eb83a6c7fd394a718f2b05a22653e5c2",
+      "furnitureId": "2101",
+      "position": {
+        "x": 5.400000095367432,
+        "y": 0.0,
+        "z": -3.6000001430511475
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "25799ec1b6c44f7b8318fa82cfc4e162",
+      "furnitureId": "12100",
+      "position": {
+        "x": 5.400000095367432,
+        "y": 0.0,
+        "z": -2.4000000953674316
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "d7455b71b620442499356d40f4388ae6",
+      "furnitureId": "19112",
+      "position": {
+        "x": 4.200000286102295,
+        "y": 0.0,
+        "z": -5.400000095367432
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "510e68cbae23460e8773b7e08b94a125",
+      "furnitureId": "19112",
+      "position": {
+        "x": 4.800000190734863,
+        "y": 0.0,
+        "z": -5.400000095367432
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "5b93f74884fb4f0cb011b110c86e1cee",
+      "furnitureId": "210360",
+      "position": {
+        "x": 4.800000190734863,
+        "y": 0.0,
+        "z": 4.800000190734863
+      },
+      "quarterTurns": 0
+    },
+    {
+      "instanceId": "ea71bfc794b94f5cae87c76f0eb2dbc3",
+      "furnitureId": "13105",
+      "position": {
+        "x": -2.4000000953674316,
+        "y": 0.0,
+        "z": 0.6000000238418579
+      },
+      "quarterTurns": 0
+    }
+  ]
+}

@@ -30,7 +30,7 @@ namespace BlueCafe
         public float[] position, rotation, scale;
         public CafeMaterial[] materials;
     }
-    [Serializable] public class CafeMaterial { public string name, texturePath; public float[] color, textureScale, textureOffset; public bool transparent; public float cutoff; public float cull; }
+    [Serializable] public class CafeMaterial { public string name, texturePath, sourceShader; public float[] color, textureScale, textureOffset; public bool transparent; public float cutoff; public float cull; }
     [Serializable] public class CafeRoom { public float width = 18, depth = 18, wallHeight = 4.8f, grid = .6f; }
     [Serializable] public class CafeInstance
     {
@@ -92,42 +92,27 @@ namespace BlueCafe
                 width = i.width, depth = i.depth, height = i.height, available = i.available
             }).ToArray() }, true);
         }
-        public static IEnumerable<CafeItem> Search(string query = "", string category = "", string theme = "") => Catalog.items.Where(i =>
-            (string.IsNullOrEmpty(query) || ((i.name ?? "") + " " + i.id).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) &&
-            (string.IsNullOrEmpty(category) || i.category == category) && (string.IsNullOrEmpty(theme) || i.theme == theme));
+        public static IEnumerable<CafeItem> Search(string query = "", string category = "", string theme = "")
+        {
+            // Load/validate derived metadata once per query, not once per item.
+            // Catalog browsing remains usable when the optional sidecar is absent.
+            var annotations = !string.IsNullOrEmpty(query) && File.Exists(CafeReconstruction.OrientationPath)
+                ? CafeReconstruction.LoadOrientations() : null;
+            return Catalog.items.Where(i =>
+                (string.IsNullOrEmpty(query) || CafeReconstruction.SearchableItemText(i, annotations).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) &&
+                (string.IsNullOrEmpty(category) || i.category == category) && (string.IsNullOrEmpty(theme) || i.theme == theme));
+        }
         public static CafeItem Find(string id) => Catalog.items.FirstOrDefault(i => i.id == id) ?? throw new CafeValidationException("UNKNOWN_ITEM", id ?? "null");
         public static bool IsRoomStyle(CafeItem item) => item.placement == "flooring" || item.placement == "wallpaper" || item.placement == "background";
         public static bool Finite(float x) => !float.IsNaN(x) && !float.IsInfinity(x);
         static void Require(bool condition, string code, string message) { if (!condition) throw new CafeValidationException(code, message); }
         public static void ValidateRoom(CafeRoom r)
         {
-            Require(r != null && Finite(r.width) && Finite(r.depth) && Finite(r.wallHeight) && Finite(r.grid), "INVALID_ROOM", "Room dimensions must be finite.");
-            Require(r.width > 0 && r.depth > 0 && r.wallHeight > 0 && r.grid > 0 && r.width <= 1000 && r.depth <= 1000 && r.grid <= Mathf.Min(r.width, r.depth), "INVALID_ROOM", "Use positive dimensions up to 1000 and a grid smaller than the room.");
+            CafeCoreAdapter.ValidateRoom(r);
         }
         public static Vector3 Constrain(CafeItem item, Vector3 position, int turns, CafeRoom room)
         {
-            ValidateRoom(room);
-            Require(Finite(position.x) && Finite(position.y) && Finite(position.z), "INVALID_TRANSFORM", "Position must be finite.");
-            Require(turns >= 0 && turns <= 3, "INVALID_ROTATION", "quarterTurns must be 0, 1, 2 or 3.");
-            if (IsRoomStyle(item)) return Vector3.zero;
-            float Snap(float value) => Mathf.Round(value / room.grid) * room.grid;
-            position = new Vector3(Snap(position.x), 0, Snap(position.z));
-            if (item.placement == "wall")
-            {
-                if (Mathf.Abs(position.x + room.width / 2) < Mathf.Abs(position.z - room.depth / 2)) position.x = -room.width / 2;
-                else position.z = room.depth / 2;
-            }
-            float w = Mathf.Max(.01f, item.width * Catalog.gridUnit), d = Mathf.Max(.01f, item.depth * Catalog.gridUnit);
-            if (turns % 2 == 1) { float temp = w; w = d; d = temp; }
-            if (item.placement == "wall")
-            {
-                bool left = Mathf.Abs(position.x + room.width / 2) < .001f;
-                float along = left ? position.z : position.x;
-                float length = left ? room.depth : room.width;
-                Require(Mathf.Abs(along) + item.width * Catalog.gridUnit / 2 <= length / 2 + .001f, "OUTSIDE_ROOM", "Wall item must fit along the wall.");
-            }
-            else Require(Mathf.Abs(position.x) + w / 2 <= room.width / 2 + .001f && Mathf.Abs(position.z) + d / 2 <= room.depth / 2 + .001f, "OUTSIDE_ROOM", "The item footprint must fit inside the room.");
-            return position;
+            return CafeCoreAdapter.Constrain(item, position, turns, room);
         }
         public static string Place(string furnitureId, float x, float z, int quarterTurns = 0, float elevation = -1)
         {
@@ -199,24 +184,7 @@ namespace BlueCafe
         }
         public static void ValidateLayout(CafeLayout layout)
         {
-            Require(layout != null && layout.version == 1 && layout.instances != null, "INVALID_LAYOUT", "Expected version 1 layout and instances array."); ValidateRoom(layout.room);
-            var ids = new HashSet<string>();
-            var styles = new HashSet<string>();
-            foreach (var instance in layout.instances)
-            {
-                Require(instance != null && !string.IsNullOrWhiteSpace(instance.instanceId) && ids.Add(instance.instanceId), "INVALID_INSTANCE", "Instances require unique nonempty ids.");
-                var item = Find(instance.furnitureId); Require(item.available, "ASSET_UNAVAILABLE", instance.furnitureId);
-                if (IsRoomStyle(item)) Require(styles.Add(item.placement) && instance.quarterTurns == 0, "INVALID_ROOM_STYLE", "Each room style must occur once with zero rotation.");
-                var p = Constrain(item, instance.position, instance.quarterTurns, layout.room);
-                Require(instance.position.y >= 0 && instance.position.y <= layout.room.wallHeight, "INVALID_ELEVATION", instance.instanceId);
-                if (item.placement == "wall")
-                {
-                    p.y = WallElevation(item, instance.position.y, layout.room);
-                    int side = Mathf.Abs(p.x + layout.room.width / 2) < .001f ? 0 : 1;
-                    Require(instance.quarterTurns == side, "INVALID_ROTATION", "Wall objects must face inward from their attached wall.");
-                }
-                Require(Vector3.Distance(p, instance.position) < .001f, "OFF_GRID", "Positions must obey grid and placement rules: " + instance.instanceId);
-            }
+            CafeCoreAdapter.ValidateLayout(layout);
         }
         public static string ExportJson() => JsonUtility.ToJson(Layout, true);
         public static void ImportJson(string json)

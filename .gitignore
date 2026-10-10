@@ -124,3 +124,15 @@ Assets/BlueCafe/Exports.meta
 __pycache__/
 *.pyc
 .vscode/
+
+# Private acquisition, verification, exports and app credentials
+/Assets/BlueCafe/Content/
+/Assets/BlueCafe/Content.meta
+/evidence/
+/.scratch/
+.env
+.env.*
+*.key
+*.pem
+*.p12
+agent.json

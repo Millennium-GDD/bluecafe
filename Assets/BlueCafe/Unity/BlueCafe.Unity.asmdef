@@ -1,0 +1,6 @@
+{
+  "name": "BlueCafe.Unity",
+  "rootNamespace": "BlueCafe.Unity",
+  "references": ["BlueCafe.Core", "BlueCafe.Infrastructure"],
+  "autoReferenced": true
+}
