@@ -15,11 +15,64 @@ namespace BlueCafe.App
         BuildSelectionOverlay buildOverlay;
         bool buildGrid;
         bool buildMoveMode;
-        Button buildSelectTool, buildMoveTool, buildGridTool;
+        bool buildAreaMode, areaSelecting, areaAdditive;
+        // Area selection follows the floor axes; Vector2.y stores world Z.
+        Vector2 areaStart, areaEnd;
+        Button buildSelectTool, buildMoveTool, buildGridTool, buildAreaTool, buildTopDownTool;
+        Rect SelectionRectangle => Rect.MinMaxRect(Mathf.Min(areaStart.x, areaEnd.x), Mathf.Min(areaStart.y, areaEnd.y), Mathf.Max(areaStart.x, areaEnd.x), Mathf.Max(areaStart.y, areaEnd.y));
+        Vector3[] SelectionWorldCorners
+        {
+            get
+            {
+                var rect = SelectionRectangle;
+                return new[] { new Vector3(rect.xMin, .01f, rect.yMin), new Vector3(rect.xMax, .01f, rect.yMin), new Vector3(rect.xMax, .01f, rect.yMax), new Vector3(rect.xMin, .01f, rect.yMax) };
+            }
+        }
+        Vector3? AreaFloorPoint(Vector2 panelPointer)
+        {
+            var local = viewport.WorldToLocal(panelPointer);
+            local = new Vector2(Mathf.Clamp(local.x, 0, viewport.contentRect.width), Mathf.Clamp(local.y, 0, viewport.contentRect.height));
+            return Floor(viewport.LocalToWorld(local));
+        }
+        bool BeginAreaSelection(Vector2 panelPointer, bool additive)
+        {
+            var point = AreaFloorPoint(panelPointer);
+            if (!point.HasValue) return false;
+            areaSelecting = true; areaAdditive = additive; areaStart = areaEnd = new Vector2(point.Value.x, point.Value.z);
+            buildOverlay?.MarkDirtyRepaint(); return true;
+        }
+        void UpdateAreaSelection(Vector2 panelPointer)
+        {
+            var point = AreaFloorPoint(panelPointer);
+            if (point.HasValue) areaEnd = new Vector2(point.Value.x, point.Value.z);
+            buildOverlay?.MarkDirtyRepaint();
+        }
+        void SetAreaMode(bool enabled)
+        {
+            CancelGesture(); buildAreaMode = enabled; viewport?.Focus(); RefreshBuildTools();
+            if (enabled) Message("Drag a floor rectangle to select furniture centers. Release to return to Select. Shift adds; Escape cancels.");
+        }
+        void CompleteAreaSelection()
+        {
+            var rectangle = SelectionRectangle;
+            if (!areaAdditive) selection.Clear();
+            foreach (var instance in Session.Layout.instances)
+            {
+                var item = BuildItem(instance.furnitureId);
+                if (item == null || Placement.IsRoomStyle(item)) continue;
+                var position = instance.position;
+                if (position.x >= rectangle.xMin && position.x <= rectangle.xMax && position.z >= rectangle.yMin && position.z <= rectangle.yMax) selection.Add(instance.instanceId);
+            }
+            areaSelecting = buildAreaMode = false; RefreshInspector(); RefreshBuildTools(); buildOverlay?.MarkDirtyRepaint();
+            Message(selection.Count + " furniture selected.");
+        }
         public bool BuildGridVisible => screen == "Build" && (buildGrid || buildMoveMode || armed != null || catalogGesture != null || dragging);
         void RefreshBuildTools()
         {
-            buildSelectTool?.EnableInClassList("active", !buildMoveMode);
+            buildSelectTool?.EnableInClassList("active", !buildMoveMode && !buildAreaMode);
+            buildAreaTool?.EnableInClassList("active", buildAreaMode);
+            buildTopDownTool?.EnableInClassList("active", View != null && View.IsTopDown);
+            if (buildTopDownTool != null) { buildTopDownTool.Q<Label>(className: "tool-label").text = View.IsTopDown ? "Oblique view" : "God’s-eye view"; buildTopDownTool.tooltip = View.IsTopDown ? "Return to the previous camera view" : "Look straight down at the cafe"; }
             buildMoveTool?.EnableInClassList("active", buildMoveMode);
             RefreshCommandStates();
             buildGridTool?.EnableInClassList("active", buildGrid);
@@ -60,16 +113,18 @@ namespace BlueCafe.App
             buildMore = Button(catalog, "Show more", () => { limit += 60; RefreshCards(); }, "build-more");
             var middle = Box(row, "canvas-column"); middle.name = "buildCanvas"; buildCanvas = middle; middle.style.overflow = Overflow.Hidden; middle.AddToClassList("build-canvas");
             viewport = new Image { name = "buildViewport", scaleMode = ScaleMode.StretchToFill, focusable = true }; viewport.AddToClassList("viewport"); middle.Add(viewport);
-            viewport.AddManipulator(new CanvasGesture(this)); viewport.RegisterCallback<WheelEvent>(e => { View.Zoom(e.delta.y); e.StopPropagation(); });
+            viewport.AddManipulator(new CanvasGesture(this)); viewport.RegisterCallback<WheelEvent>(e => { if (areaSelecting || dragging || panning) CancelGesture(); View.Zoom(e.delta.y); e.StopPropagation(); });
             buildOverlay = new BuildSelectionOverlay(this); middle.Add(buildOverlay);
             var floating = Box(middle, "build-floating-tools"); floating.pickingMode = PickingMode.Ignore; var tools = Box(floating, "build-tools");
             buildSelectTool = Tool(tools, "0 selected", "select", () => { CancelGesture(); viewport.Focus(); RefreshCards(); }, "active"); buildSelectTool.name = "buildSelect"; buildSelectTool.tooltip = "Select and drag furniture. Shift adds to selection."; selectionLabel = buildSelectTool.Q<Label>(className: "tool-label"); selectionLabel.name = "buildSelectionCount";
+            buildAreaTool = IconButton(tools, "area-select", () => SetAreaMode(!buildAreaMode), "Area select: drag a floor rectangle around furniture centers, then release to return to Select. Shift adds to selection."); buildAreaTool.name = "buildAreaSelect";
             IconButton(tools, "rotate", () => RotateSelection(), "Rotate selection clockwise 90° (R)").name = "buildRotate";
             Box(tools, "build-tool-separator");
             buildGridTool = IconButton(tools, "grid", () => { buildGrid = !buildGrid; RefreshBuildTools(); buildOverlay.MarkDirtyRepaint(); }, "Keep grid visible"); buildGridTool.name = "buildGrid"; buildGridTool.tooltip = "Keep the grid visible after moving or placing furniture. Floor moves snap to half a tile; wall moves snap to one tile."; RefreshBuildTools();
             IconButton(tools, "duplicate", () => Apply(Session.Duplicate(selection)), "Duplicate selection (Ctrl+D)").name = "buildDuplicate";
             IconButton(tools, "delete", () => Apply(Session.Delete(selection)), "Delete selection").name = "buildDelete";
-            var viewTools = Box(middle, "build-view-tools"); Tool(viewTools, "Fit room", "frame", () => View.FrameRoom());
+            var viewTools = Box(middle, "build-view-tools"); Tool(viewTools, "Fit room", "frame", () => { CancelGesture(); View.FrameRoom(); }).name = "buildFitRoom";
+            buildTopDownTool = Tool(viewTools, "God’s-eye view", "top-down", () => { CancelGesture(); View.ToggleTopDown(); RefreshBuildTools(); }); buildTopDownTool.name = "buildTopDown";
             IconButton(viewTools, "zoom-out", () => View.Zoom(2), "Zoom out"); IconButton(viewTools, "zoom-in", () => View.Zoom(-2), "Zoom in");
             inspector = Box(row, "inspector"); inspector.name = "inspectorPanel"; inspector.AddToClassList("build-inspector"); ConfigureBuildPanels(row, catalog, middle, inspector); ConfigureFloatingToolbar(floating, tools); RefreshCards(); RefreshInspector();
         }
@@ -252,6 +307,22 @@ namespace BlueCafe.App
             {
                 if (app.View == null || app.Session == null || contentRect.width < 1 || contentRect.height < 1) return;
                 var p = context.painter2D; app.DrawWallGrid(p, Project);
+                if (app.areaSelecting)
+                {
+                    var corners = app.SelectionWorldCorners.Select(Project).ToArray();
+                    var polygon = CanvasClip.Polygon(new Rect(3, 3, Mathf.Max(0, contentRect.width - 6), Mathf.Max(0, contentRect.height - 6)), corners);
+                    p.strokeColor = new Color(.02f, .49f, 1); p.fillColor = new Color(.02f, .49f, 1, .12f); p.lineWidth = 2.2f;
+                    if (polygon.Length > 0)
+                    {
+                        p.BeginPath(); p.MoveTo(polygon[0]); for (int i = 1; i < polygon.Length; i++) p.LineTo(polygon[i]); p.ClosePath(); p.Fill(); p.Stroke();
+                    }
+                    p.fillColor = new Color(.02f, .49f, 1); p.strokeColor = Color.white; p.lineWidth = 1.5f;
+                    foreach (var corner in corners)
+                    {
+                        if (!new Rect(7, 7, Mathf.Max(0, contentRect.width - 14), Mathf.Max(0, contentRect.height - 14)).Contains(corner)) continue;
+                        p.BeginPath(); p.Arc(corner, 4.5f, Angle.Degrees(0), Angle.Degrees(360)); p.Fill(); p.Stroke();
+                    }
+                }
                 if (app.BuildGridVisible)
                 {
                     var room = app.Session.Layout.room; float step = room.grid * Mathf.Max(1, Mathf.Ceil(Mathf.Max(room.width, room.depth) / room.grid / 100));

@@ -58,7 +58,8 @@ namespace BlueCafe.App
                 var data = new BetaState { theme = preferences.theme, dark = root.ClassListContains("theme-dark"), preferences = JsonUtility.ToJson(preferences),
                     canvas = buildCanvas?.worldBound ?? Rect.zero, catalog = catalogPanel?.worldBound ?? Rect.zero, inspector = inspectorPanel?.worldBound ?? Rect.zero, toolbar = floatingToolbar?.worldBound ?? Rect.zero,
                     controls = root.Query<Button>().ToList().Select(b => new BetaControl { name = b.name, text = b.text, tooltip = b.tooltip, enabled = b.enabledInHierarchy, bounds = b.worldBound }).ToArray(),
-                    camera = View.Camera.transform.position, size = View.Camera.orthographicSize };
+                    camera = View.Camera.transform.position, size = View.Camera.orthographicSize, topDown = View.IsTopDown, cameraForward = View.Camera.transform.forward, areaMode = buildAreaMode, areaSelecting = areaSelecting, selectionRectangle = SelectionRectangle,
+                    selectionPolygon = SelectionWorldCorners.Select(world => { var point = View.Camera.WorldToViewportPoint(world); return new Vector2(point.x * (viewport?.contentRect.width ?? 0), (1 - point.y) * (viewport?.contentRect.height ?? 0)); }).ToArray() };
                 return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(data) };
             }
             if (a.action == "profile-start") { measuredFrames.Clear(); measureFrames = true; return ProbeReply(); }
@@ -73,7 +74,7 @@ namespace BlueCafe.App
             return null;
         }
         [Serializable] sealed class BetaControl { public string name, text, tooltip; public bool enabled; public Rect bounds; }
-        [Serializable] sealed class BetaState { public string theme, preferences; public bool dark; public Rect canvas, catalog, inspector, toolbar; public Vector3 camera; public float size; public BetaControl[] controls; }
+        [Serializable] sealed class BetaState { public string theme, preferences; public bool dark, topDown, areaMode, areaSelecting; public Rect canvas, catalog, inspector, toolbar, selectionRectangle; public Vector3 camera, cameraForward; public Vector2[] selectionPolygon; public float size; public BetaControl[] controls; }
         [Serializable] sealed class BetaPerformance { public float[] samples; public int frames; public float fps, p95ms; }
         [Serializable] sealed class BetaPreviewPerformance { public double[] samples; public double p95ms; }
         [Serializable] sealed class BetaElement { public Rect bounds; public string background, display; }

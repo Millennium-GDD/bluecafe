@@ -187,3 +187,32 @@ recorded separately; neither is a timed physical-input human workflow.
 Saved startup preferences retain a default saved cafe ID separately from the current document. A first profile stores an Empty room with original flooring/wallpaper IDs 1/2 and opens it clean once a compatible pack is selected. Selecting another saved cafe as startup does not replace or dirty the open document. Pack refresh preserves these preferences; a valid saved default reopens clean on launch. Rename preserves saved cafe identity, and named-area rename/delete changes only area records through Core history.
 
 Wall selection alone does not enable automatic wall grids. Armed placement and active wall moves show the grid; the manual Grid preference remains independent. Wall dragging can transfer an attachment to another visible cardinal wall, with current footprint validation, preview cancellation and one undoable commit. Rooms plan thumbnails reuse supplied original thumbnails within footprint bounds; missing previews stay explicit and the retained thumbnail scope is bounded.
+
+## 0.1.1 workspace controls
+
+Build Area select uses a rectangle on the floor XZ plane and selects furniture
+instance centers within it, including wall decorations and unavailable catalog instances;
+room-wide flooring/wallpaper/background styles are excluded. Shift adds to the existing
+selection. Selection is view state and does not revise or dirty the document.
+Escape, lost pointer capture, focus loss and a changed document revision cancel
+an in-progress rectangle without changing the selection. Drag endpoints clamp
+to the canvas before projecting onto the floor. The active outline projects the
+four floor corners, so it appears as a parallelogram in oblique view. Releasing
+the left button completes selection and immediately returns to normal Select.
+
+Middle-drag orbits the camera around the actual cafe center at half wall height
+with azimuth/elevation angles, preserving radius, zoom and panned framing;
+elevation stays between 5 and 85 degrees. Meaningful orbit exits top-down.
+Right-drag pans. Only a stationary right-click opens the furniture menu.
+God's-eye view looks vertically down,
+fits the complete enclosure, and toggles back to the previous camera pan/zoom.
+Fit room respects the current view mode; wall inspection exits top-down.
+Portable image capture retains deterministic oblique framing and restores the
+active viewport camera afterward.
+
+Presets can reveal a saved cafe's existing record in the desktop file manager.
+Bundled examples materialize their original TextAsset bytes into app storage
+under Examples, keyed by source SHA-256. Existing modified copies are preserved.
+Missing files report unavailable. Linux requests file selection through
+FileManager1 with containing-folder fallback; Windows and macOS use their native
+reveal commands. File-manager actions leave the open document and history intact.

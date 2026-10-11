@@ -2,9 +2,9 @@
 
 An independent Unity cafe designer with standalone Linux and Windows apps and retained Editor tools.
 
-The beta adds a Rooms workspace, named floor areas, wall decoration height and movement, complete asset browsing, editable presets and a saved startup cafe. Floors at 40×40 and larger retain their original appearance. The public packages contain the app and required runtime libraries; supply a separate compatible prepared asset pack.
+Version 0.1.1 adds preset file-manager reveal, floor-plane area selection, middle-drag camera orbit and a God’s-eye view toggle. The app also includes a Rooms workspace, named floor areas, wall decoration height and movement, complete asset browsing, editable presets and a saved startup cafe. Floors at 40×40 and larger retain their original appearance. The public packages contain the app and required runtime libraries; supply a separate compatible prepared asset pack.
 
-## Run the beta
+## Run 0.1.1
 
 Download the package for your platform from [Releases](https://github.com/Millennium-GDD/bluecafe/releases), and extract the entire archive.
 
@@ -29,11 +29,11 @@ First startup saves an **Empty room** in My cafes and opens it clean. Select a s
 
 ## Controls
 
-Drag a catalog item into the room, or click it and choose a placement. Drag selected furniture to move; **R** rotates, **Ctrl+D** duplicates, **Delete** removes, **Ctrl+Z** undoes and **Ctrl+Shift+Z** redoes. Shift adds to selection. Right-drag pans, scroll zooms, and **Fit room** restores framing. Escape closes a popup or cancels the current gesture.
+Drag a catalog item into the room, or click it and choose a placement. Drag selected furniture to move; **R** rotates, **Ctrl+D** duplicates, **Delete** removes, **Ctrl+Z** undoes and **Ctrl+Shift+Z** redoes. Shift adds to selection. Middle-drag orbits around the cafe, right-drag pans, scroll zooms, and **Fit room** restores framing. **God’s-eye view** toggles a fitted view from directly above and returns to the previous framing. Use **Area select** in the toolbar and drag a rectangle on the floor to select furniture centers; Shift adds to selection. Release returns to normal Select so you can immediately move the selected furniture. The rectangle follows the floor in oblique view. Escape closes a popup or cancels the current gesture.
 
 Select a wall decoration to change its mounting-center **Height (m)**, raise/lower it by one grid step, or drag it along/up the wall and onto another visible wall. Automatic floor/wall grids appear during movement; the manual Grid control remains available.
 
-Rooms edits the cafe enclosure and named polygon areas. Named areas classify flooring and wallpaper; they do not create internal physical partitions. Presets open on double-click and can be renamed. Build also supports cafe naming.
+Rooms edits the cafe enclosure and named polygon areas. Named areas classify flooring and wallpaper; they do not create internal physical partitions. Presets open on double-click and can be renamed. **Open in file manager** reveals a saved cafe record; bundled examples are materialized as portable JSON in the app’s Examples folder. Build also supports cafe naming.
 
 ## Develop
 
@@ -52,15 +52,15 @@ python3 bin/feedback.py tests
 
 ```csharp
 BlueCafe.App.Editor.StandaloneBuild.ScheduleTo(
-    "Builds/Linux-Beta5/BlueCafe.x86_64", "evidence/linux-beta5",
-    "0.1.0-beta.5", false);
+    "Builds/Linux-0.1.1/BlueCafe.x86_64", "evidence/linux-0.1.1",
+    "0.1.1", false);
 ```
 
 See [Windows build instructions](docs/WINDOWS-BUILD.md) for Windows builds and packaging. Build outputs and local data are ignored by Git.
 
 ## Verification and limitations
 
-Beta.5 passed 196 EditMode tests. Linux executable checks cover original assets, save/reopen, Rooms resizing with undo/redo, styled/offset rooms and default floors through 1,000×1,000. Windows cross-build and package integrity checks passed; Windows execution, rendering, input, recovery and upgrade behavior remain to be tested on Windows. Clean-machine, human timing/visual approval, accessibility and full performance budgets remain open. No macOS package is provided.
+The corrected 0.1.1 implementation passed all 209 Unity EditMode tests. Synthetic UI events in the actual Linux development Player verified floor-plane area selection in both directions, one-shot release, immediate group dragging with undo/redo, middle-drag spherical orbit, right-drag pan and the God’s-eye toggle in simple and dense original-asset layouts. These checks do not establish physical mouse or native file-manager behavior. Earlier Linux executable checks cover original assets, save/reopen, Rooms resizing with undo/redo, styled/offset rooms and default floors through 1,000×1,000. Windows cross-build and package integrity checks passed; Windows execution, rendering, input, recovery and upgrade behavior remain to be tested on Windows. Clean-machine, human timing/visual approval, accessibility and full performance budgets remain open. No macOS package is provided.
 
 Read [verification requirements](docs/VERIFICATION.md) and [integration contracts](docs/CONTRACTS.md) before changing implementation boundaries. Local acquisition evidence and reference captures are excluded. Editor reconstruction diagnostics that need those local files report unavailable when they are absent.
 

@@ -19,6 +19,12 @@ namespace BlueCafe.App
             var rooms = ProbeRooms(a); if (rooms != null) return rooms;
             if (a.action == "state") return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(new UiState { screen = screen, selected = selection.Count, selectionIds = selection.ToArray(), armed = armed, focusedName = (root.panel?.focusController.focusedElement as VisualElement)?.name, focusedType = root.panel?.focusController.focusedElement?.GetType().Name, focusedAttached = (root.panel?.focusController.focusedElement as VisualElement)?.panel != null, recoveryPending = recoveryPending, modal = modal != null, placementPreview = View.HasPlacementPreview, placementPreviewValid = View.PlacementPreviewValid, previewInstance = View.PlacementPreviewInstance, renderedObjects = View.ObjectCount, cachedThumbnails = thumbnails.Count, pinnedThumbnails = thumbnailPins.Count, visibleImages = root.Query<Image>().ToList().Count(i => i.image), blankImages = root.Query<Image>().ToList().Count(i => !i.image), labels = root.Query<Label>().ToList().Select(l => l.text).ToArray(), buttons = root.Query<Button>().ToList().Select(b => b.text).ToArray() }) };
             if (a.action == "screenshot") { ScreenCapture.CaptureScreenshot(a.path); return ProbeReply(); }
+            if (a.action == "release-pointer")
+            {
+                viewport.ReleasePointer(pointerId);
+                using (var lost = PointerCaptureOutEvent.GetPooled(viewport, null, pointerId)) viewport.SendEvent(lost);
+                return ProbeReply();
+            }
             if (a.action == "placement-state")
             {
                 return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(new PlacementState {
@@ -131,7 +137,7 @@ namespace BlueCafe.App
             }
             else { target = viewport; point = FloorToPanel(a.x, a.z); }
             if (a.action == "pointer-position") return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(new PointerPosition { x = (point.x - root.worldBound.x) * Screen.width / root.worldBound.width, y = (point.y - root.worldBound.y) * Screen.height / root.worldBound.height, width = Screen.width, height = Screen.height, floorX = Floor(point)?.x ?? float.NaN, floorZ = Floor(point)?.z ?? float.NaN }) };
-            var raw = new Event { type = a.action == "down" ? EventType.MouseDown : a.action == "move" ? EventType.MouseDrag : EventType.MouseUp, button = a.category == "right" ? 1 : 0, mousePosition = point, modifiers = a.shift ? EventModifiers.Shift : EventModifiers.None };
+            var raw = new Event { type = a.action == "down" ? EventType.MouseDown : a.action == "move" ? EventType.MouseDrag : EventType.MouseUp, button = a.category == "right" ? 1 : a.category == "middle" ? 2 : 0, mousePosition = point, modifiers = a.shift ? EventModifiers.Shift : EventModifiers.None };
             if (a.action == "down") { using (var e = PointerDownEvent.GetPooled(raw)) target.SendEvent(e); }
             else if (a.action == "move") { using (var e = PointerMoveEvent.GetPooled(raw)) target.SendEvent(e); }
             else { using (var e = PointerUpEvent.GetPooled(raw)) target.SendEvent(e); }

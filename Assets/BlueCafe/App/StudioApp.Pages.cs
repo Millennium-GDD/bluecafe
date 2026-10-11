@@ -22,7 +22,7 @@ namespace BlueCafe.App
         Coroutine presetRendering;
         sealed class PresetEntry
         {
-            public string key, name, cafeId, updatedUtc;
+            public string key, name, cafeId, updatedUtc, exampleId;
             public Layout layout;
             public bool example;
         }
@@ -188,7 +188,7 @@ namespace BlueCafe.App
                     foreach (var id in new[] { "momo", "abydos", "library", "ship" })
                     {
                         var source = Resources.Load<TextAsset>("Examples/" + id); if (source == null) continue;
-                        try { var layout = DocumentStore.ParseLayout(source.text); entries.Add(new PresetEntry { key = "example:" + id, name = layout.name, layout = layout, example = true }); }
+                        try { var layout = DocumentStore.ParseLayout(source.text); entries.Add(new PresetEntry { key = "example:" + id, name = layout.name, layout = layout, example = true, exampleId = id }); }
                         catch (Exception e) { Message("Example " + id + ": " + e.Message); }
                     }
                 }
@@ -281,6 +281,24 @@ namespace BlueCafe.App
             }
             Tool(detail, "Open as new cafe", "plus", () => OpenPreset(entry, true), entry.example ? "primary preset-open preset-action" : "preset-open preset-action").name = "presetOpenCopy";
             Tool(detail, "Export preset", "export", () => InputModal("Export preset", "JSON path", Path.Combine(appData, "Exports", SafePresetFilename(entry.name) + ".layout.json"), path => { DocumentStore.SaveLayout(path, entry.layout); Message("Exported " + path); }), "preset-export preset-action");
+            var revealStatus = Label(detail, "", "preset-action-hint");
+            revealStatus.style.display = DisplayStyle.None;
+            Button reveal = null;
+            reveal = Tool(detail, "Open in file manager", "folder", async () =>
+            {
+                reveal.SetEnabled(false); revealStatus.style.display = DisplayStyle.Flex; revealStatus.text = "Opening file manager…";
+                try
+                {
+                    string path = PresetFilePath(entry);
+                    bool selected = await NativeDialogs.RevealFile(path);
+                    revealStatus.text = (selected ? "Revealed " : "Opened containing folder for ") + Path.GetFileName(path);
+                    Message(revealStatus.text);
+                }
+                catch (Exception e) { revealStatus.text = e.Message; Message(e.Message); }
+                finally { reveal.SetEnabled(true); }
+            }, "preset-action");
+            reveal.name = "presetRevealFile";
+            reveal.tooltip = entry.example ? "Reveal a local copy of this bundled example's original JSON" : "Reveal this saved cafe's JSON file";
             Label(detail, "Opening prompts you to save unsaved work. Export leaves the current cafe open.", "preset-action-hint");
             Tool(detail, "Enlarge preview", "frame", () => EnlargePresetPreview(entry), "preset-action").name = "presetEnlargePreview";
             var facts = new Foldout { text = "Cafe details", value = false }; facts.AddToClassList("preset-detail-facts"); detail.Add(facts);
@@ -288,6 +306,29 @@ namespace BlueCafe.App
             int unavailable = entry.layout.instances.Count(i => !Pack.Catalog.items.Any(p => p.id == i.furnitureId && p.available));
             PresetStat(facts, unavailable == 0 ? "check" : "warning", unavailable == 0 ? "All assets available" : unavailable + " items unavailable");
             var interior = Box(facts, "preset-interior"); Label(interior, "Interior", "subheading"); DrawInterior(interior, entry.layout, false);
+        }
+        string PresetFilePath(PresetEntry entry)
+        {
+            if (!entry.example)
+            {
+                if (!Guid.TryParseExact(entry.cafeId, "N", out _)) throw new InvalidOperationException("This saved preset identity is unavailable.");
+                return Path.Combine(store.Root, "cafes", entry.cafeId + ".json");
+            }
+            var source = Resources.Load<TextAsset>("Examples/" + entry.exampleId);
+            if (source == null) throw new FileNotFoundException("This bundled example is unavailable: " + entry.name);
+            var bytes = source.bytes;
+            string hash;
+            using (var sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+            var folder = Path.Combine(store.Root, "Examples"); Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, entry.exampleId + "-" + hash + ".layout.json");
+            // Reuse the original copy, but preserve any local edits instead of overwriting them.
+            if (File.Exists(path))
+            {
+                if (File.ReadAllBytes(path).SequenceEqual(bytes)) return path;
+                path = Path.Combine(folder, entry.exampleId + "-" + hash + "-" + Guid.NewGuid().ToString("N") + ".layout.json");
+            }
+            using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)) file.Write(bytes, 0, bytes.Length);
+            return path;
         }
         void OpenPreset(PresetEntry entry, bool copy = false)
         {

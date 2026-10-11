@@ -33,6 +33,8 @@ namespace BlueCafe.App
                 case "undo": case "redo": case "rotate": { bool redo=k=="redo" || k=="rotate"; float X(float x)=>redo?24-x:x; p.BeginPath(); p.MoveTo(V(X(19),18)); p.BezierCurveTo(V(X(25),7),V(X(9),4),V(X(5),10)); p.Stroke(); Line(p,V(X(5),5),V(X(5),11),V(X(11),11)); break; }
                 case "save": Rect(p,4,3,16,18); Rect(p,8,3,8,7); Rect(p,7,14,10,7); break;
                 case "select": Line(p,V(5,3),V(6,20),V(11,15),V(15,21),V(18,19),V(14,13),V(21,12),V(5,3)); break;
+                case "area-select": Line(p,V(3,8),V(3,3),V(8,3)); Line(p,V(16,3),V(21,3),V(21,8)); Line(p,V(3,16),V(3,21),V(8,21)); Line(p,V(16,21),V(21,21),V(21,16)); Rect(p,8,8,8,8); break;
+                case "top-down": Rect(p,3,3,18,18); Circle(p,12,12,4); Line(p,V(12,5),V(12,8)); Line(p,V(12,16),V(12,19)); Line(p,V(5,12),V(8,12)); Line(p,V(16,12),V(19,12)); break;
                 case "move": Line(p,V(12,2),V(12,22)); Line(p,V(2,12),V(22,12)); Line(p,V(8,6),V(12,2),V(16,6)); Line(p,V(8,18),V(12,22),V(16,18)); Line(p,V(6,8),V(2,12),V(6,16)); Line(p,V(18,8),V(22,12),V(18,16)); break;
                 case "duplicate": Rect(p,8,8,13,13); Line(p,V(16,6),V(16,3),V(3,3),V(3,16),V(6,16)); break;
                 case "delete": Line(p,V(4,6),V(20,6)); Line(p,V(8,6),V(8,3),V(16,3),V(16,6)); Line(p,V(6,6),V(7,21),V(17,21),V(18,6)); Line(p,V(10,10),V(10,17)); Line(p,V(14,10),V(14,17)); break;

@@ -170,6 +170,175 @@ namespace BlueCafe.Unity.Tests
             Assert.That(view.Camera.transform.position,Is.EqualTo(position));Assert.That(view.Camera.transform.rotation,Is.EqualTo(rotation));Assert.That(view.Camera.farClipPlane,Is.EqualTo(far));Assert.That(view.Camera.orthographicSize,Is.EqualTo(size));
             Assert.That(view.Camera.transform.InverseTransformPoint(background.position).z,Is.EqualTo(depthBefore).Within(.001));AssertDepth();
         }
+        [TestCase(false, .5f)] [TestCase(false, 2f)] [TestCase(true, .5f)] [TestCase(true, 2f)]
+        public void SparseOffCenterCafeFitsEntireEnclosureInEitherView(bool topDown, float aspect)
+        {
+            var layout = Layout("sparse"); layout.version = 2;
+            layout.room = new Room { width = 1000, depth = 700, wallHeight = 12, centerX = 1200, centerZ = -850 };
+            layout.instances[0].position = new Position(layout.room.centerX, 0, layout.room.centerZ);
+            view = CreateView(); view.Sync(layout, 1); view.Camera.aspect = aspect;
+            if (topDown) view.ToggleTopDown(); else view.FrameRoom();
+            Assert.That(view.IsTopDown, Is.EqualTo(topDown));
+            if (topDown) Assert.That(Vector3.Dot(view.Camera.transform.forward, Vector3.down), Is.GreaterThan(.99999f));
+            foreach (var point in Geometry.Extent(layout.room)) foreach (float height in new[] { 0, layout.room.wallHeight })
+            {
+                var viewport = view.Camera.WorldToViewportPoint(new Vector3(point.x, height, point.z));
+                Assert.That(viewport.x, Is.InRange(0f, 1f), "Sparse furniture must not reduce the editing canvas.");
+                Assert.That(viewport.y, Is.InRange(0f, 1f));
+                Assert.That(viewport.z, Is.InRange(view.Camera.nearClipPlane, view.Camera.farClipPlane));
+            }
+        }
+        [Test] public void TopDownReturnsToPannedZoomedWallCameraAndWallFocusExitsMode()
+        {
+            view = CreateView(); view.Sync(Layout("furniture"), 1); view.Render(320, 240);
+            view.FocusWall("right"); view.Pan(new Vector2(41, -23)); view.Zoom(-3);
+            var position = view.Camera.transform.position; var rotation = view.Camera.transform.rotation;
+            var size = view.Camera.orthographicSize; var far = view.Camera.farClipPlane;
+            view.ToggleTopDown(); Assert.That(view.IsTopDown, Is.True);
+            var floor = view.FloorPoint(new Vector2(160, 120), new Rect(0, 0, 320, 240));
+            Assert.That(floor.HasValue, Is.True); Assert.That(floor.Value.y, Is.EqualTo(0).Within(.0001f));
+            view.Pan(new Vector2(-19, 32)); view.Zoom(2); view.FrameRoom();
+            Assert.That(view.IsTopDown, Is.True, "Frame must retain the chosen floor-plan mode.");
+            view.ToggleTopDown();
+            Assert.That(view.IsTopDown, Is.False); Assert.That(view.Camera.transform.position, Is.EqualTo(position));
+            Assert.That(view.Camera.transform.rotation, Is.EqualTo(rotation)); Assert.That(view.Camera.orthographicSize, Is.EqualTo(size));
+            Assert.That(view.Camera.farClipPlane, Is.EqualTo(far));
+            view.ToggleTopDown(); view.FocusWall("back");
+            Assert.That(view.IsTopDown, Is.False, "Wall inspection must remain available from the floor-plan view.");
+            Assert.That(Vector3.Dot(view.Camera.transform.forward, Vector3.down), Is.LessThan(.99f));
+        }
+        [Test] public void TopDownSurvivesRoomEditsAndCapturePreservesItWhileUsingStandardObliqueOutput()
+        {
+            view = CreateView(); var layout = Layout("furniture"); view.Sync(layout, 1); view.Render(128, 128);
+            var obliquePath = Path.Combine(directory, "oblique.png"); view.Capture(obliquePath, 128, 128);
+            view.ToggleTopDown(); view.Pan(new Vector2(14, 5)); view.Zoom(-2);
+            var position = view.Camera.transform.position; var rotation = view.Camera.transform.rotation; var size = view.Camera.orthographicSize;
+            var topDownPath = Path.Combine(directory, "top-down-capture.png"); view.Capture(topDownPath, 128, 128);
+            CollectionAssert.AreEqual(File.ReadAllBytes(obliquePath), File.ReadAllBytes(topDownPath), "Capture must retain its standard oblique contract.");
+            Assert.That(view.IsTopDown, Is.True); Assert.That(view.Camera.transform.position, Is.EqualTo(position));
+            Assert.That(view.Camera.transform.rotation, Is.EqualTo(rotation)); Assert.That(view.Camera.orthographicSize, Is.EqualTo(size));
+            layout.room.width = 25; layout.room.centerX = 12; view.Sync(layout, 2);
+            Assert.That(view.IsTopDown, Is.True); Assert.That(Vector3.Dot(view.Camera.transform.forward, Vector3.down), Is.GreaterThan(.99999f));
+            foreach (var point in Geometry.Extent(layout.room))
+            {
+                var viewport = view.Camera.WorldToViewportPoint(new Vector3(point.x, 0, point.z));
+                Assert.That(viewport.x, Is.InRange(0f, 1f)); Assert.That(viewport.y, Is.InRange(0f, 1f));
+            }
+        }
+        [TestCase(0f, 0f)] [TestCase(1200f, -850f)]
+        public void OrbitMovesOnSphereAroundActualRoomCenterWithoutRollOrZoom(float centerX, float centerZ)
+        {
+            var layout = Layout(); layout.version = 2;
+            layout.room.centerX = centerX; layout.room.centerZ = centerZ;
+            view = CreateView(); view.Sync(layout, 7);
+            var pivot = new Vector3(centerX, layout.room.wallHeight * .5f, centerZ);
+            var offset = new Vector3(30, 20, -40);
+            view.Camera.transform.SetPositionAndRotation(pivot + offset, Quaternion.LookRotation(-offset, Vector3.up));
+            view.Zoom(-3); float size = view.Camera.orthographicSize;
+            var initialCenter = view.Camera.WorldToViewportPoint(pivot);
+            view.Orbit(new Vector2(360, 0));
+            Assert.That(Vector3.Distance(view.Camera.transform.position - pivot, new Vector3(-40, 20, -30)), Is.LessThan(.001f),
+                "A quarter-circle drag must rotate about the cafe center, including an off-center enclosure.");
+            var center = view.Camera.WorldToViewportPoint(pivot);
+            var cameraCenter = view.Camera.transform.InverseTransformPoint(pivot);
+            Assert.That(cameraCenter.x, Is.EqualTo(0).Within(.001f), "The center must remain on the camera sightline in world space.");
+            Assert.That(cameraCenter.y, Is.EqualTo(0).Within(.001f));
+            Assert.That(center.x, Is.EqualTo(initialCenter.x).Within(.0001f), "Orbit must preserve the original projected center.");
+            Assert.That(center.y, Is.EqualTo(initialCenter.y).Within(.0001f));
+            Assert.That(view.Camera.transform.right.y, Is.EqualTo(0).Within(.0001f), "Orbit must not introduce camera roll.");
+            Assert.That(view.Camera.orthographicSize, Is.EqualTo(size)); Assert.That(view.Revision, Is.EqualTo(7));
+        }
+        [Test] public void OrbitAfterPanPreservesCurrentRadiusAndReversesWithoutAFramingSnap()
+        {
+            var layout = Layout("furniture"); layout.version = 2; layout.room.centerX = 31; layout.room.centerZ = -19;
+            view = CreateView(); view.Sync(layout, 3); view.Pan(new Vector2(29, -17)); view.Zoom(-2);
+            var pivot = new Vector3(layout.room.centerX, layout.room.wallHeight * .5f, layout.room.centerZ);
+            var position = view.Camera.transform.position; var rotation = view.Camera.transform.rotation;
+            float radius = Vector3.Distance(position, pivot), size = view.Camera.orthographicSize;
+            view.Orbit(new Vector2(.1f, .1f));
+            Assert.That(Quaternion.Angle(rotation, view.Camera.transform.rotation), Is.LessThan(.1f),
+                "A tiny first orbit must advance the panned sightline, not snap it toward the room center.");
+            view.Orbit(new Vector2(-.1f, -.1f));
+            view.Orbit(new Vector2(120, 32));
+            Assert.That(Vector3.Distance(view.Camera.transform.position, pivot), Is.EqualTo(radius).Within(.0001f));
+            Assert.That(Quaternion.Angle(rotation, view.Camera.transform.rotation), Is.GreaterThan(10));
+            view.Orbit(new Vector2(-120, -32));
+            Assert.That(Vector3.Distance(view.Camera.transform.position, position), Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(view.Camera.transform.rotation, rotation), Is.LessThan(.05f));
+            Assert.That(view.Camera.orthographicSize, Is.EqualTo(size)); Assert.That(view.Revision, Is.EqualTo(3));
+        }
+        [Test] public void OrbitElevationStaysAboveFloorAndAwayFromVerticalPole()
+        {
+            var layout = Layout(); view = CreateView(); view.Sync(layout, 1);
+            var pivot = new Vector3(layout.room.centerX, layout.room.wallHeight * .5f, layout.room.centerZ);
+            float radius = Vector3.Distance(view.Camera.transform.position, pivot);
+            view.Orbit(new Vector2(0, 10000));
+            var offset = (view.Camera.transform.position - pivot).normalized;
+            Assert.That(Mathf.Asin(offset.y) * Mathf.Rad2Deg, Is.EqualTo(85).Within(.001f));
+            Assert.That(Vector3.Dot(view.Camera.transform.forward, Vector3.down), Is.LessThan(.999f));
+            view.Orbit(new Vector2(0, -10000));
+            offset = (view.Camera.transform.position - pivot).normalized;
+            Assert.That(Mathf.Asin(offset.y) * Mathf.Rad2Deg, Is.EqualTo(5).Within(.001f));
+            Assert.That(view.Camera.transform.position.y, Is.GreaterThan(0));
+            Assert.That(Vector3.Distance(view.Camera.transform.position, pivot), Is.EqualTo(radius).Within(.0001f));
+            Assert.That(view.Camera.transform.right.y, Is.EqualTo(0).Within(.0001f));
+        }
+        [Test] public void OnlyMeaningfulOrbitExitsTopDownAndNextToggleRestoresOrbitedCamera()
+        {
+            view = CreateView(); view.Sync(Layout("furniture"), 1); view.ToggleTopDown();
+            var topPosition = view.Camera.transform.position; var topRotation = view.Camera.transform.rotation;
+            float size = view.Camera.orthographicSize;
+            view.Orbit(Vector2.zero); view.Orbit(new Vector2(.001f, -.001f));
+            Assert.Throws<ArgumentException>(() => view.Orbit(new Vector2(float.NaN, 0)));
+            Assert.That(view.IsTopDown, Is.True); Assert.That(view.Camera.transform.position, Is.EqualTo(topPosition));
+            Assert.That(view.Camera.transform.rotation, Is.EqualTo(topRotation));
+            view.Orbit(new Vector2(40, -24));
+            Assert.That(view.IsTopDown, Is.False); Assert.That(Vector3.Dot(view.Camera.transform.forward, Vector3.down), Is.LessThan(.999f));
+            Assert.That(view.Camera.orthographicSize, Is.EqualTo(size));
+            var position = view.Camera.transform.position; var rotation = view.Camera.transform.rotation;
+            float far = view.Camera.farClipPlane;
+            view.ToggleTopDown(); view.Pan(new Vector2(20, 8)); view.Zoom(2); view.ToggleTopDown();
+            Assert.That(view.IsTopDown, Is.False); Assert.That(view.Camera.transform.position, Is.EqualTo(position));
+            Assert.That(view.Camera.transform.rotation, Is.EqualTo(rotation)); Assert.That(view.Camera.orthographicSize, Is.EqualTo(size));
+            Assert.That(view.Camera.farClipPlane, Is.EqualTo(far));
+        }
+        [Test] public void OrbitUpdatesBackgroundAndDepthForLargeOffCenterCafe()
+        {
+            var catalog = pack.Catalog; catalog.items[0].placement = "background";
+            File.WriteAllText(Path.Combine(directory, "catalog.json"), JsonUtility.ToJson(catalog)); pack = Pack.Load(directory);
+            var layout = Layout("background"); layout.version = 2;
+            layout.room = new Room { width = 1000, depth = 600, wallHeight = 12, centerX = 1200, centerZ = -850 };
+            view = CreateView(); view.Sync(layout, 1); view.Orbit(new Vector2(460, -80));
+            var background = view.Camera.transform.parent.Cast<Transform>().Single(t => t.name == "Runtime test fixture [background]");
+            var local = view.Camera.transform.InverseTransformPoint(background.position);
+            Assert.That(local.x, Is.EqualTo(0).Within(.001f)); Assert.That(local.y, Is.EqualTo(0).Within(.001f));
+            Assert.That(Quaternion.Angle(background.rotation, view.Camera.transform.rotation), Is.LessThan(.05f));
+            Assert.That(local.z, Is.LessThan(view.Camera.farClipPlane));
+            foreach (var point in Geometry.Extent(layout.room)) foreach (float height in new[] { 0, layout.room.wallHeight })
+            {
+                float depth = view.Camera.transform.InverseTransformPoint(new Vector3(point.x, height, point.z)).z;
+                Assert.That(depth, Is.GreaterThan(view.Camera.nearClipPlane));
+                Assert.That(depth, Is.LessThan(local.z), "The original background must remain behind every enclosure corner after orbit.");
+            }
+        }
+        [Test] public void OrbitRefreshesPhysicalWallCutawayImmediately()
+        {
+            var catalog = pack.Catalog; catalog.items[0].placement = "wallpaper";
+            File.WriteAllText(Path.Combine(directory, "catalog.json"), JsonUtility.ToJson(catalog)); pack = Pack.Load(directory);
+            var layout = Layout("walls"); layout.version = 2;
+            view = CreateView(); view.Sync(layout, 1); Assert.That(view.Unavailable, Is.Empty);
+            var walls = view.Camera.transform.parent.Cast<Transform>().Single(t => t.name == "Runtime test fixture [walls]");
+            var initialVisibility = walls.Cast<Transform>().ToDictionary(t => t, t => t.gameObject.activeSelf);
+            Assert.That(initialVisibility.Values.Any(active => active), Is.True);
+            Assert.That(initialVisibility.Values.Any(active => !active), Is.True);
+            view.Orbit(new Vector2(720, 0));
+            foreach (var entry in initialVisibility)
+                Assert.That(entry.Key.gameObject.activeSelf, Is.EqualTo(!entry.Value), "The opposite bearing must expose the opposite physical wall modules.");
+            view.ToggleTopDown(); Assert.That(walls.Cast<Transform>().All(t => t.gameObject.activeSelf), Is.True);
+            view.Orbit(new Vector2(40, -24));
+            Assert.That(walls.Cast<Transform>().Any(t => !t.gameObject.activeSelf), Is.True,
+                "Leaving God's-eye view must immediately restore oblique cutaway.");
+        }
         [Test] public void SimultaneousViewsDoNotChangeCapturedPixelsAndRestoreVisibility()
         {
             view=CreateView();view.Sync(Layout("isolated"),1);

@@ -15,23 +15,24 @@ Exit Play mode and let compilation finish. Select **BlueCafe → Build Windows
 x64 release**, or use the guarded helper from the project root:
 
 ```sh
-python3 bin/feedback.py eval --code 'return BlueCafe.App.Editor.WindowsStandaloneBuild.ScheduleTo();'
+python3 bin/feedback.py eval --code 'return BlueCafe.App.Editor.WindowsStandaloneBuild.ScheduleTo("Builds/Windows-0.1.1/BlueCafe.exe", "evidence/windows-0.1.1/release", "0.1.1", false);'
 ```
 
-Scheduling writes `result: "Queued"` immediately and returns. Wait for `evidence/windows-build/build-result.json`
+Scheduling writes `result: "Queued"` immediately and returns. Wait for `evidence/windows-0.1.1/release/build-result.json`
 to contain `result: "Succeeded"` before packaging. A failed build records the
 exception in that report and `build-error.txt`. A CLI scheduling response is not
 build success.
 
-Default output: `Builds/Windows/BlueCafe.exe`; version: `0.1.0-beta.5`;
-development mode: off. Preserve earlier outputs and choose an empty folder for
+The legacy no-argument builder defaults to `Builds/Windows/BlueCafe.exe` and
+`0.1.0-beta.5`, with development mode off. Use explicit paths and version for a
+0.1.1 release. Preserve earlier outputs and choose an empty folder for
 each new build. A custom build can be scheduled with:
 
 ```csharp
 BlueCafe.App.Editor.WindowsStandaloneBuild.ScheduleTo(
-    "Builds/Windows-Beta5/BlueCafe.exe",
-    "evidence/windows-beta5/release",
-    "0.1.0-beta.5",
+    "Builds/Windows-0.1.1/BlueCafe.exe",
+    "evidence/windows-0.1.1/release",
+    "0.1.1",
     false);
 ```
 
@@ -55,7 +56,7 @@ unity build "$PWD" \
   --editor-version 6000.2.6f2 \
   --target StandaloneWindows64 \
   --execute-method BlueCafe.App.Editor.WindowsStandaloneBuild.BuildFromCommandLine \
-  --output-path Builds/Windows/BlueCafe.exe
+  --output-path Builds/Windows-0.1.1/BlueCafe.exe
 ```
 
 PowerShell equivalent:
@@ -65,14 +66,14 @@ unity build "$($PWD.Path)" `
   --editor-version 6000.2.6f2 `
   --target StandaloneWindows64 `
   --execute-method BlueCafe.App.Editor.WindowsStandaloneBuild.BuildFromCommandLine `
-  --output-path Builds/Windows/BlueCafe.exe
+  --output-path Builds/Windows-0.1.1/BlueCafe.exe
 ```
 
 Custom version/evidence and development mode can be supplied via Unity CLI's
 `--args`, for example:
 
 ```sh
---args '-blueCafeVersion 0.1.0-beta.5 -blueCafeEvidence evidence/windows-beta5/release'
+--args '-blueCafeVersion 0.1.1 -blueCafeEvidence evidence/windows-0.1.1/release'
 ```
 
 Add `-blueCafeDevelopment` inside that string for a development Player. Use
@@ -83,22 +84,18 @@ Add `-blueCafeDevelopment` inside that string for a development Player. Use
 After a successful release build:
 
 ```sh
-python3 tools/package_windows.py
+python3 tools/package_windows.py \
+  --source Builds/Windows-0.1.1 \
+  --evidence evidence/windows-0.1.1/release
 ```
 
 The package script validates the recorded target, backend, version, output path
 and every Player file hash before creating
-`Builds/BlueCafe-0.1.0-beta.5-windows-x86_64.zip`. It includes notices, the font
+`Builds/BlueCafe-0.1.1-windows-x86_64.zip`. It includes notices, the font
 license, runtime libraries and a manifest. It refuses existing destinations.
 Preserve prior packaging records and use fresh evidence for each release: the
 packager also refuses existing `manifest.json` and `package.json` records.
-For custom paths:
-
-```sh
-python3 tools/package_windows.py \
-  --source Builds/Windows-Beta5 \
-  --evidence evidence/windows-beta5/release
-```
+Use the matching source and evidence arguments when choosing other build paths.
 
 Extract the entire ZIP and run `BlueCafe.exe`. Unity Editor and Python are not
 required at runtime. Supply a separate compatible prepared asset pack through

@@ -48,7 +48,11 @@ namespace BlueCafe.Unity
         Room room;
         float backgroundDepth = 200;
         bool framed, disposed;
+        Vector3 previousViewPosition;
+        Quaternion previousViewRotation;
+        float previousViewSize, previousViewFar, previousBackgroundDepth;
         public Camera Camera { get; }
+        public bool IsTopDown { get; private set; }
         public long Revision { get; private set; } = -1;
         public IReadOnlyList<RenderUnavailable> Unavailable => unavailable;
         public long ResourceBytes => resources.Bytes + fittedBytes;
@@ -229,24 +233,49 @@ namespace BlueCafe.Unity
         public void FrameRoom()
         {
             CheckThread(); if (room == null) return; framed = true;
-            var rotation = Quaternion.LookRotation(-new Vector3(1, .95f, -1.4f).normalized, Vector3.up);
+            var rotation = IsTopDown ? Quaternion.LookRotation(Vector3.down, Vector3.forward)
+                : Quaternion.LookRotation(-new Vector3(1, .95f, -1.4f).normalized, Vector3.up);
             var inverse = Quaternion.Inverse(rotation);
             var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             void Include(Vector3 point) { var p = inverse * point; min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
             var renderers = root.GetComponentsInChildren<Renderer>(true).Where(r => !IsPlacementPreviewRenderer(r) && !framingHelpers.Contains(r) && !backgrounds.Any(b => r.transform.IsChildOf(b.transform))).ToArray();
-            if (renderers.Length == 0)
-                for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++) Include(new Vector3(room.centerX + (x - .5f) * room.width, 0, room.centerZ + (z - .5f) * room.depth));
+            // The enclosure remains the editing canvas even in a sparse cafe,
+            // with unavailable room styles, or while perimeter modules are cut away.
+            for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++)
+                Include(new Vector3(room.centerX + (x - .5f) * room.width, y * room.wallHeight, room.centerZ + (z - .5f) * room.depth));
             foreach (var renderer in renderers)
             {
                 var b = renderer.bounds;
                 for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++) Include(new Vector3(x == 0 ? b.min.x : b.max.x, y == 0 ? b.min.y : b.max.y, z == 0 ? b.min.z : b.max.z));
             }
             var center = (min + max) / 2;
-            Camera.transform.SetPositionAndRotation(rotation * new Vector3(center.x, center.y, min.z - 50), rotation);
-            SetCameraDepth(max.z-min.z+50);
+            // Orthographic framing is independent of camera distance. Leave
+            // enough radius for every bearing, so later orbiting a large cafe
+            // cannot sweep the camera's near plane through an enclosure corner.
+            float distance = (max - min).magnitude * .5f + 50;
+            Camera.transform.SetPositionAndRotation(rotation * new Vector3(center.x, center.y, center.z - distance), rotation);
+            SetCameraDepth(distance + (max.z - min.z) * .5f);
             Camera.orthographicSize = Mathf.Max(.1f, Mathf.Max((max.y - min.y) / 2, (max.x - min.x) / 2 / Mathf.Max(.1f, Camera.aspect)) * 1.09f);
-            UpdateBackgrounds();
+            UpdateBackgrounds(); UpdateWallCutaway();
+        }
+        /// <summary>Toggle a vertical floor-plan view; returning restores the camera used before entry, including pan and zoom.</summary>
+        public void ToggleTopDown()
+        {
+            CheckThread(); if (room == null) return;
+            if (!IsTopDown)
+            {
+                previousViewPosition = Camera.transform.position; previousViewRotation = Camera.transform.rotation;
+                previousViewSize = Camera.orthographicSize; previousViewFar = Camera.farClipPlane; previousBackgroundDepth = backgroundDepth;
+                IsTopDown = true; FrameRoom();
+            }
+            else
+            {
+                IsTopDown = false;
+                Camera.transform.SetPositionAndRotation(previousViewPosition, previousViewRotation);
+                Camera.orthographicSize = previousViewSize; Camera.farClipPlane = previousViewFar; backgroundDepth = previousBackgroundDepth;
+                UpdateBackgrounds(); UpdateWallCutaway();
+            }
         }
         void UpdateBackgrounds()
         {
@@ -266,13 +295,14 @@ namespace BlueCafe.Unity
         {
             foreach(var pair in wallModules) if(pair.Key) {
                 int side=Geometry.WallTurns(pair.Value);var inward=side==0?Vector3.right:side==1?Vector3.back:side==2?Vector3.left:Vector3.forward;
-                pair.Key.gameObject.SetActive(Vector3.Dot(inward,Camera.transform.forward)<-.0001f);
+                pair.Key.gameObject.SetActive(IsTopDown || Vector3.Dot(inward,Camera.transform.forward)<-.0001f);
             }
         }
-        /// <summary>Inspect any supported wall from inside the cafe; FrameRoom restores the standard oblique view.</summary>
+        /// <summary>Inspect any supported wall from inside the cafe, leaving the top-down view.</summary>
         public void FocusWall(string wallId)
         {
             CheckThread();if(room==null)return;int side=Geometry.WallTurns(wallId);
+            IsTopDown = false;
             var inward=side==0?Vector3.right:side==1?Vector3.back:side==2?Vector3.left:Vector3.forward;
             var tangent=Vector3.Cross(Vector3.up,inward);float span=Math.Max(room.width,room.depth);
             var target=new Vector3(room.centerX,room.wallHeight*.45f,room.centerZ);var from=target+inward*span+tangent*span*.3f+Vector3.up*span*.55f;
@@ -281,6 +311,54 @@ namespace BlueCafe.Unity
             UpdateWallCutaway();UpdateBackgrounds();
         }
         public void Pan(Vector2 delta) { CheckThread(); Camera.transform.position += (-Camera.transform.right * delta.x + Camera.transform.up * delta.y) * Camera.orthographicSize / 350; }
+        /// <summary>Orbit around the actual cafe center, preserving radius, orthographic zoom and panned framing.</summary>
+        public void Orbit(Vector2 delta)
+        {
+            CheckThread();
+            if (float.IsNaN(delta.x) || float.IsNaN(delta.y) || float.IsInfinity(delta.x) || float.IsInfinity(delta.y))
+                throw new ArgumentException("Orbit delta must be finite.", nameof(delta));
+            if (room == null || delta.sqrMagnitude <= .0001f) return;
+            var pivot = new Vector3(room.centerX, room.wallHeight * .5f, room.centerZ);
+            var offset = Camera.transform.position - pivot;
+            float radius = offset.magnitude;
+            if (radius < .01f) return;
+            float elevation = Mathf.Asin(Mathf.Clamp(offset.y / radius, -1, 1)) * Mathf.Rad2Deg;
+            // A vertical view has no positional azimuth. Retain the previous
+            // oblique bearing so the first drag does not pick an arbitrary side.
+            var bearing = IsTopDown ? -(previousViewRotation * Vector3.forward) : -Camera.transform.forward;
+            float azimuth = offset.x * offset.x + offset.z * offset.z > .0001f
+                ? Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg : Mathf.Atan2(bearing.x, bearing.z) * Mathf.Rad2Deg;
+            float yawChange = delta.x * .25f;
+            float nextElevation = Mathf.Clamp(elevation + delta.y * .25f, 5, 85);
+            float pitchChange = nextElevation - elevation;
+            // Pan deliberately offsets the sightline from the fixed orbit
+            // center. Advance both spherical bearings by the same angle rather
+            // than snapping that sightline back to the center on the first drag.
+            var backward = -Camera.transform.forward;
+            float viewAzimuth = IsTopDown ? azimuth : Mathf.Atan2(backward.x, backward.z) * Mathf.Rad2Deg;
+            float viewElevation = Mathf.Asin(Mathf.Clamp(backward.y, -1, 1)) * Mathf.Rad2Deg;
+            Vector3 Direction(float yaw, float pitch)
+            {
+                yaw *= Mathf.Deg2Rad; pitch *= Mathf.Deg2Rad;
+                return new Vector3(Mathf.Sin(yaw) * Mathf.Cos(pitch), Mathf.Sin(pitch), Mathf.Cos(yaw) * Mathf.Cos(pitch));
+            }
+            Camera.transform.SetPositionAndRotation(pivot + Direction(azimuth + yawChange, nextElevation) * radius,
+                Quaternion.LookRotation(-Direction(viewAzimuth + yawChange, Mathf.Clamp(viewElevation + pitchChange, 5, 85)), Vector3.up));
+            IsTopDown = false;
+            // Rotation can expose a deeper diagonal than the previous fitted
+            // view, particularly in a very large rectangular cafe.
+            float geometryDepth = 0;
+            void Include(Vector3 point) => geometryDepth = Mathf.Max(geometryDepth, Camera.transform.InverseTransformPoint(point).z);
+            for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++)
+                Include(new Vector3(room.centerX + (x - .5f) * room.width, y * room.wallHeight, room.centerZ + (z - .5f) * room.depth));
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true).Where(r => !IsPlacementPreviewRenderer(r) && !framingHelpers.Contains(r) && !backgrounds.Any(b => r.transform.IsChildOf(b.transform))))
+            {
+                var b = renderer.bounds;
+                for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++)
+                    Include(new Vector3(x == 0 ? b.min.x : b.max.x, y == 0 ? b.min.y : b.max.y, z == 0 ? b.min.z : b.max.z));
+            }
+            SetCameraDepth(geometryDepth); UpdateBackgrounds(); UpdateWallCutaway();
+        }
         public void Zoom(float delta) { CheckThread(); Camera.orthographicSize = Mathf.Clamp(Camera.orthographicSize * Mathf.Exp(delta * .04f), 1, Mathf.Max(300,room==null?0:room.width+room.depth)); }
         public RenderTexture Render(int width, int height)
         {
@@ -329,10 +407,12 @@ namespace BlueCafe.Unity
             var oldPosition = Camera.transform.position; var oldRotation = Camera.transform.rotation;
             var oldSize = Camera.orthographicSize; var oldAspect = Camera.aspect;
             var oldFar = Camera.farClipPlane; var oldBackgroundDepth = backgroundDepth;
+            bool oldTopDown = IsTopDown;
             var previous = RenderTexture.active; Texture2D image = null;
             try
             {
-                Camera.aspect = (float)width / height; FrameRoom(); Render(width, height); RenderTexture.active = texture;
+                // Portable captures retain the established standard oblique framing.
+                IsTopDown = false; Camera.aspect = (float)width / height; FrameRoom(); Render(width, height); RenderTexture.active = texture;
                 image = new Texture2D(width, height, TextureFormat.RGB24, false);
                 image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply();
                 path = Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -341,7 +421,8 @@ namespace BlueCafe.Unity
             finally
             {
                 RenderTexture.active = previous; RuntimeResources.Release(image);
-                Camera.transform.SetPositionAndRotation(oldPosition, oldRotation); Camera.orthographicSize = oldSize; Camera.aspect = oldAspect; Camera.farClipPlane=oldFar; backgroundDepth=oldBackgroundDepth; UpdateBackgrounds();
+                IsTopDown = oldTopDown;
+                Camera.transform.SetPositionAndRotation(oldPosition, oldRotation); Camera.orthographicSize = oldSize; Camera.aspect = oldAspect; Camera.farClipPlane=oldFar; backgroundDepth=oldBackgroundDepth; UpdateBackgrounds(); UpdateWallCutaway();
             }
         }
         public void Dispose()

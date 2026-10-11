@@ -131,7 +131,7 @@ namespace BlueCafe.App
             if (floatingToolbar == null || buildCanvas == null || screen != "Build") return;
             float width = Mathf.Max(0, buildCanvas.contentRect.width), height = Mathf.Max(0, buildCanvas.contentRect.height);
             if (width < 1 || height < 1 || float.IsNaN(floatingToolbar.layout.width) || float.IsNaN(floatingToolbar.layout.height)) return;
-            float toolbarWidth = preferences.toolbarMinimized ? Mathf.Min(220, width - 12) : Mathf.Min(390, width - 12);
+            float toolbarWidth = preferences.toolbarMinimized ? Mathf.Min(220, width - 12) : Mathf.Min(435, width - 12);
             if (Mathf.Abs(floatingToolbar.resolvedStyle.width - toolbarWidth) > .1f) floatingToolbar.style.width = toolbarWidth;
             toolbarCommands.style.width = Length.Percent(100);
             float x = Mathf.Max(0, width - toolbarWidth) * preferences.toolbarX, y = Mathf.Max(0, height - floatingToolbar.layout.height) * preferences.toolbarY;

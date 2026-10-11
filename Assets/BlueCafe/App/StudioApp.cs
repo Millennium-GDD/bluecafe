@@ -392,7 +392,7 @@ namespace BlueCafe.App
             {
                 if (handledEscapeFrame == Time.frameCount) { e.StopImmediatePropagation(); return; }
                 bool handled = CancelTopPopup();
-                if (!handled) { handled = armed != null || dragging || panning || catalogGesture != null || buildMoveMode; CancelGesture(); }
+                if (!handled) { handled = armed != null || dragging || panning || catalogGesture != null || buildMoveMode || buildAreaMode || areaSelecting; CancelGesture(); }
                 if (handled) { handledEscapeFrame = Time.frameCount; e.StopImmediatePropagation(); }
                 return;
             }
@@ -418,22 +418,29 @@ namespace BlueCafe.App
             View?.ClearPlacementPreview();
             if (previewing && View != null && Session != null) View.Sync(Session.Layout, Session.Revision);
             if (armed != null && cards != null) foreach (var card in cards.Children()) card.EnableInClassList("selected", false);
-            previewing = dragging = panning = false; armed = null; buildMoveMode = false; gestureLayout = null; catalogGesture?.Cancel(); catalogGesture = null;
+            previewing = dragging = panning = areaSelecting = false; armed = null; buildMoveMode = buildAreaMode = false; gestureLayout = null; catalogGesture?.Cancel(); catalogGesture = null;
             if (viewport != null && viewport.HasPointerCapture(pointerId)) viewport.ReleasePointer(pointerId);
             RefreshBuildTools();
         }
         sealed class CanvasGesture : PointerManipulator
         {
             readonly StudioApp app;
-            Vector2 panStart; bool panMoved;
+            Vector2 panStart; bool panMoved; int panButton;
             public CanvasGesture(StudioApp app) { this.app = app; }
             protected override void RegisterCallbacksOnTarget() { target.RegisterCallback<PointerDownEvent>(Down); target.RegisterCallback<PointerMoveEvent>(Move); target.RegisterCallback<PointerUpEvent>(Up); target.RegisterCallback<PointerCaptureOutEvent>(Lost); }
             protected override void UnregisterCallbacksFromTarget() { target.UnregisterCallback<PointerDownEvent>(Down); target.UnregisterCallback<PointerMoveEvent>(Move); target.UnregisterCallback<PointerUpEvent>(Up); target.UnregisterCallback<PointerCaptureOutEvent>(Lost); }
             void Down(PointerDownEvent e)
             {
-                if (app.modal != null || app.dragging || app.panning) return; app.pointerId = e.pointerId; app.lastPointer = e.position; target.Focus();
-                if (e.button == 1) { app.panning = true; panStart = e.position; panMoved = false; target.CapturePointer(e.pointerId); e.StopPropagation(); return; }
+                if (app.modal != null || app.dragging || app.panning || app.areaSelecting) return;
+                if (e.button != 0 && e.button != 1 && e.button != 2) return;
+                app.pointerId = e.pointerId; app.lastPointer = e.position; target.Focus();
+                if (e.button == 1 || e.button == 2) { app.panning = true; panButton = e.button; panStart = e.position; panMoved = false; target.CapturePointer(e.pointerId); e.StopPropagation(); return; }
                 if (e.button != 0) return;
+                if (app.buildAreaMode)
+                {
+                    if (app.BeginAreaSelection(e.position, e.shiftKey)) { app.gestureRevision = app.Session.Revision; target.CapturePointer(e.pointerId); }
+                    e.StopPropagation(); return;
+                }
                 if (app.armed != null) { var furnitureId = app.armed; if (app.BuildItem(furnitureId)?.placement == "wall") { if (app.TryWallCandidate(furnitureId, e.position, out var candidate, out var validation)) { if (validation.success) app.CompletePlacement(app.CommitWallPlacement(candidate)); else app.Message(validation.code + ": " + validation.message); } else app.Message("Click a visible wall to set the mounting height."); } else { var floor = app.Floor(e.position); if (floor.HasValue) app.CompletePlacement(app.Session.Place(furnitureId, floor.Value.x, floor.Value.z)); } return; }
                 string id = app.View.Pick(target.WorldToLocal(e.position), new Rect(Vector2.zero, target.contentRect.size));
                 if (!e.shiftKey && !(app.buildMoveMode && id == null) && (id == null || !app.selection.Contains(id))) app.selection.Clear(); if (id != null) app.selection.Add(id); app.RefreshInspector();
@@ -445,20 +452,45 @@ namespace BlueCafe.App
             void Move(PointerMoveEvent e)
             {
                 if (e.pointerId != app.pointerId) return;
+                if (app.areaSelecting)
+                {
+                    if (app.Session.Revision != app.gestureRevision) { app.CancelGesture(); app.Message("The cafe changed during area selection. Try again."); return; }
+                    app.UpdateAreaSelection(e.position); e.StopPropagation(); return;
+                }
                 if (app.dragging && app.Session.Revision != app.gestureRevision) { app.CancelGesture(); app.Message("REVISION_CONFLICT: the cafe changed while moving furniture."); return; }
-                if (app.panning) { if (!panMoved && Vector2.Distance(panStart, e.position) >= 6) panMoved = true; if (panMoved) { app.View.Pan((Vector2)e.position - app.lastPointer); app.lastPointer = e.position; } return; }
+                if (app.panning)
+                {
+                    if (!panMoved && Vector2.Distance(panStart, e.position) >= 6) panMoved = true;
+                    if (panMoved)
+                    {
+                        var delta = (Vector2)e.position - app.lastPointer;
+                        if (panButton == 2) app.View.Orbit(delta); else app.View.Pan(delta);
+                        app.lastPointer = e.position; app.RefreshBuildTools();
+                    }
+                    e.StopPropagation(); return;
+                }
                 if (!app.dragging) return; if (app.UpdateWallMove(e.position)) return; var p = app.Floor(e.position); if (p == null) return;
                 var preview = new Session(app.Pack.Catalog, app.gestureLayout); var result = preview.Move(app.selection, p.Value.x - app.moveStart.x, p.Value.z - app.moveStart.z);
                 if (result.success) { app.View.Sync(preview.Layout, app.gestureRevision); app.previewing = true; app.Message("Release to move selection."); } else { app.View.Sync(app.Session.Layout, app.Session.Revision); app.previewing = false; app.Message(result.code + ": " + result.message); }
             }
             void Up(PointerUpEvent e)
             {
-                if (e.pointerId != app.pointerId || (!app.dragging && !app.panning)) return;
+                if (e.pointerId != app.pointerId || (!app.dragging && !app.panning && !app.areaSelecting)) return;
+                if (app.areaSelecting)
+                {
+                    if (e.button != 0) return;
+                    if (app.Session.Revision != app.gestureRevision) { app.CancelGesture(); app.Message("The cafe changed during area selection. Try again."); return; }
+                    app.UpdateAreaSelection(e.position);
+                    app.CompleteAreaSelection(); target.ReleasePointer(e.pointerId); e.StopPropagation(); return;
+                }
+                if (app.panning && e.button != panButton || app.dragging && e.button != 0) return;
                 if (app.CompleteWallMove(e.position, target.worldBound.Contains(e.position))) return;
                 bool move = app.dragging && target.worldBound.Contains(e.position); var p = move ? app.Floor(e.position) : null; float dx = p == null ? 0 : p.Value.x - app.moveStart.x, dz = p == null ? 0 : p.Value.z - app.moveStart.z; long revision = app.gestureRevision;
-                bool context = app.panning && !panMoved && e.button == 1 && target.worldBound.Contains(e.position); app.CancelGesture(); if (context) app.FurnitureMenu(e.position); if (p != null && (Mathf.Abs(dx) > .001f || Mathf.Abs(dz) > .001f)) app.Apply(app.Session.Move(app.selection, dx, dz, revision));
+                bool context = app.panning && !panMoved && panButton == 1 && target.worldBound.Contains(e.position);
+                bool retainAreaMode = app.buildAreaMode; app.CancelGesture(); app.buildAreaMode = retainAreaMode; app.RefreshBuildTools();
+                if (context) app.FurnitureMenu(e.position); if (p != null && (Mathf.Abs(dx) > .001f || Mathf.Abs(dz) > .001f)) app.Apply(app.Session.Move(app.selection, dx, dz, revision));
             }
-            void Lost(PointerCaptureOutEvent e) { if (e.pointerId == app.pointerId && (app.dragging || app.panning)) app.CancelGesture(); }
+            void Lost(PointerCaptureOutEvent e) { if (e.pointerId == app.pointerId && (app.dragging || app.panning || app.areaSelecting)) app.CancelGesture(); }
         }
         public Response Dispatch(Request request)
         {

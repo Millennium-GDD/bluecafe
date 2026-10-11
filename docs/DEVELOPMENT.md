@@ -16,7 +16,7 @@ Core and Infrastructure tests use synthetic catalog/mesh fixtures. Integration a
 For Linux, schedule a release build through the resident Editor:
 
 ```sh
-python3 bin/feedback.py eval --code 'return BlueCafe.App.Editor.StandaloneBuild.ScheduleTo("Builds/Linux-Beta/BlueCafe.x86_64", "evidence/linux-build", "0.1.0-beta.5", false);'
+python3 bin/feedback.py eval --code 'return BlueCafe.App.Editor.StandaloneBuild.ScheduleTo("Builds/Linux-0.1.1/BlueCafe.x86_64", "evidence/linux-0.1.1", "0.1.1", false);'
 ```
 
 Wait for the local `build-result.json` to report success with no errors. Scheduling alone is not build success. Builds prepare the Bootstrap scene/UI panel through Editor APIs; keep the Player executable, adjacent data and Unity runtime libraries together. Downloaded content stays external. For Windows Mono builds and strict ZIP packaging, see [WINDOWS-BUILD.md](WINDOWS-BUILD.md).

@@ -42,6 +42,7 @@
 .build-view-tools { position: absolute; left: 0; right: 0; bottom: 14px; flex-direction: row; justify-content: center; align-items: center; }
 .build-view-tools > Button { background-color: var(--surface); height: 36px; margin: 0 3px; font-size: 12px; }
 .build-view-tools > .icon { width: 35px; }
+.build-view-tools > Button.active { background-color: var(--input); color: var(--accent-text); }
 .build-inspector { width: 302px; padding: 22px 20px; background-color: var(--surface); }
 .build-inspector-scroll { flex-grow: 1; }
 .build-inspector .heading { margin-bottom: 15px; font-size: 20px; }
