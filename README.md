@@ -2,6 +2,8 @@
 
 A desktop cafe layout editor built with Unity.
 
+<img width="3199" height="1917" alt="Screenshot_20261011_153549" src="https://github.com/user-attachments/assets/837ab0da-ba21-43cf-97f2-1630d80c817d" />
+
 ## Run
 
 Download a build from [Releases](https://github.com/Millennium-GDD/bluecafe/releases) and extract the archive.
