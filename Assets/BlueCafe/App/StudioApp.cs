@@ -50,7 +50,7 @@ namespace BlueCafe.App
         float lastEdit, firstDirty, lastRecoveryAttempt;
         long recoveredRevision = -1;
         string documentId = Guid.NewGuid().ToString("N");
-        bool recoveryOffered, recoveryPending;
+        bool recoveryOffered, recoveryPending, invalidTransformField;
         RecoveryRecord pendingRecovery;
         long recoveryBaselineRevision;
         string recoveryBaselineDocumentId;
@@ -66,7 +66,7 @@ namespace BlueCafe.App
             appData = Application.persistentDataPath;
             var args = Environment.GetCommandLineArgs();
             appData = Arg(args, "--data-path") ?? appData;
-            store = new DocumentStore(appData);
+            store = new DocumentStore(appData); LoadViewPreferences();
             var panelTemplate = Resources.Load<PanelSettings>("StudioPanel");
             var panel = panelTemplate ? Instantiate(panelTemplate) : ScriptableObject.CreateInstance<PanelSettings>();
             panel.themeStyleSheet = Resources.Load<ThemeStyleSheet>("StudioTheme");
@@ -77,11 +77,11 @@ namespace BlueCafe.App
             panel.textSettings = textSettings;
             var document = gameObject.AddComponent<UIDocument>(); document.panelSettings = panel;
             root = document.rootVisualElement; root.style.unityFontDefinition = FontDefinition.FromSDFFont(textSettings.defaultFontAsset); root.AddToClassList("studio"); root.styleSheets.Add(Resources.Load<StyleSheet>("Studio"));
-            foreach (var stylesheet in new[] { "Build", "Pages", "Rooms" }) root.styleSheets.Add(Resources.Load<StyleSheet>(stylesheet));
+            foreach (var stylesheet in new[] { "Build", "Pages", "Rooms", "Workspace", "Themes" }) root.styleSheets.Add(Resources.Load<StyleSheet>(stylesheet));
             root.RegisterCallback<AttachToPanelEvent>(e => { if (e.target == root) BindPopupEvents(); });
             root.RegisterCallback<DetachFromPanelEvent>(e => { if (e.target == root) UnbindPopupEvents(); });
             BindPopupEvents();
-            BuildShell();
+            BuildShell(); InitializeTheme();
             Application.wantsToQuit += WantsToQuit;
             try { bridge = new LocalBridge(Path.Combine(appData, "agent.json")); } catch (Exception e) { Message("Agent bridge: " + e.Message); }
             var packRoot = Arg(args, "--asset-pack") ?? store.LoadSettings().packRoot;
@@ -96,7 +96,7 @@ namespace BlueCafe.App
         {
             var b = new Button(() => Safe(action)) { text = text, tooltip = tooltip ?? text }; Classes(b, cls);
             if (b.ClassListContains("icon")) { b.text = ""; b.Add(new StudioIcon(tooltip ?? text)); }
-            parent.Add(b); return b;
+            b.RegisterCallback<FocusInEvent>(_ => { if (footer != null && b.ClassListContains("icon")) footer.text = b.tooltip; }); parent.Add(b); return b;
         }
         Button Tool(VisualElement parent, string text, string icon, Action action, string cls = null)
         {
@@ -119,11 +119,14 @@ namespace BlueCafe.App
             var logo = new StudioIcon("coffee"); logo.AddToClassList("brand-icon"); header.Add(logo); Label(header, "BlueCafe", "brand");
             Menu(header, "File", new[] { ("New cafe", (Action)(() => ReplacePrompt(NewCafe))), ("Import layout…", (Action)Import), ("Save cafe", (Action)Save), ("Export layout…", (Action)ExportLayout), ("Export image…", (Action)ExportImage) });
             Menu(header, "Edit", new[] { ("Undo", (Action)(() => Apply(Session.Undo(), false))), ("Redo", (Action)(() => Apply(Session.Redo(), false))), ("Duplicate selection", (Action)(() => Apply(Session.Duplicate(selection)))), ("Delete selection", (Action)(() => Apply(Session.Delete(selection)))) });
-            Menu(header, "View", new[] { ("Frame room", (Action)(() => View?.FrameRoom())), ("Rooms", (Action)(() => ShowScreen("Rooms"))), ("Assets", (Action)(() => ShowScreen("Assets"))) });
-            Menu(header, "Help", new[] { ("Controls", (Action)(() => { var p = Modal("Cafe controls"); Label(p, "Click or drag a catalog item to place it. Drag furniture to move it; hold Shift to select a group. R rotates, Delete removes, Ctrl+D duplicates. Right-drag pans and scrolling zooms. Ctrl+Z undoes; Ctrl+S saves.", "message"); Button(p, "Close", CloseModal, "primary"); })) });
-            var titleRow = Box(header, "title-row row"); title = Label(titleRow, "Untitled cafe", "title"); saveState = new StudioIcon("check"); titleRow.Add(saveState);
-            IconButton(header, "undo", () => Apply(Session.Undo(), false), "Undo (Ctrl+Z)");
-            IconButton(header, "redo", () => Apply(Session.Redo(), false), "Redo (Ctrl+Shift+Z)");
+            Menu(header, "View", new[] { ("Fit room", (Action)(() => View?.FrameRoom())), ("View left wall", (Action)(() => View?.FocusWall("left"))), ("View back wall", (Action)(() => View?.FocusWall("back"))), ("View right wall", (Action)(() => View?.FocusWall("right"))), ("View front wall", (Action)(() => View?.FocusWall("front"))), ("Show/hide Catalog", (Action)(() => TogglePanel(true))), ("Show/hide Inspector", (Action)(() => TogglePanel(false))), ("Reset toolbar position", (Action)ResetToolbar), ("Operation status", (Action)ShowOperationStatus), ("Rooms", (Action)(() => ShowScreen("Rooms"))), ("Assets", (Action)(() => ShowScreen("Assets"))) });
+            Menu(header, "Help", new[] { ("Controls", (Action)ControlsHelp), ("Commands · Ctrl+K", (Action)CommandPalette) });
+            var titleRow = Box(header, "title-row row"); title = Label(titleRow, "Untitled cafe", "title"); title.name = "cafeTitle"; title.tooltip = "Double-click to rename cafe";
+            title.RegisterCallback<ClickEvent>(e => { if (e.clickCount == 2 && Session != null) RenameCafe(); });
+            var rename = IconButton(titleRow, "pen", () => { if (Session != null) RenameCafe(); }, "Rename cafe"); rename.name = "headerRenameCafe";
+            saveState = new StudioIcon("check"); titleRow.Add(saveState);
+            IconButton(header, "undo", () => Apply(Session.Undo(), false), "Undo (Ctrl+Z)").name = "commandUndo";
+            IconButton(header, "redo", () => Apply(Session.Redo(), false), "Redo (Ctrl+Shift+Z)").name = "commandRedo";
             IconButton(header, "save", Save, "Save cafe (Ctrl+S)", "primary");
             IconButton(header, "image", ExportImage, "Export image");
             var body = Box(root, "body"); var ribbon = Box(body, "ribbon");
@@ -138,16 +141,16 @@ namespace BlueCafe.App
         }
         void Menu(VisualElement parent, string text, (string label, Action action)[] entries)
         {
-            Button button = null; button = Button(parent, text, () => { var menu = new GenericDropdownMenu(); foreach (var entry in entries) { var action = entry.action; if (Session == null && text != "Help") menu.AddDisabledItem(entry.label, false); else menu.AddItem(entry.label, false, () => { button.Focus(); Safe(action); }); } StudioDropdown.Prepare(menu); menu.DropDown(button.worldBound, button, false, false); }, "menu-button");
+            Button button = null; button = Button(parent, text, () => { var menu = new GenericDropdownMenu(); foreach (var entry in entries) { var action = entry.action; if (text != "Help" && !CommandEnabled(entry.label)) menu.AddDisabledItem(entry.label, false); else menu.AddItem(entry.label, false, () => { button.Focus(); Safe(action); }); } StudioDropdown.Prepare(menu); menu.DropDown(button.worldBound, button, false, false); }, "menu-button");
         }
         void ShowScreen(string next)
         {
-            CancelGesture(); screen = next; workspace.Clear(); viewport = null; inspector = null; cards = null; search = null; selectionLabel = null;
+            CaptureBrowsingContext(); CancelGesture(); screen = next; workspace.Clear(); viewport = null; inspector = null; cards = null; search = null; selectionLabel = null;
             BeginThumbnailScope(Array.Empty<string>());
             foreach (var button in root.Query<Button>(className: "nav").ToList()) button.EnableInClassList("active", button.name == next);
             if (next == "Settings") SettingsPage();
             else if (Pack == null) { var p = Box(workspace, "page"); Label(p, next, "heading"); Label(p, "Choose a prepared BlueCafe asset pack to begin.", "message"); Button(p, "Configure asset folder", () => ShowScreen("Settings"), "primary"); }
-            else if (next == "Build") BuildPage();
+            else if (next == "Build") { BuildPage(); RestoreBuildBrowsingContext(); }
             else if (next == "Assets") AssetsPage();
             else if (next == "Presets") PresetsPage();
             else RoomsPage();
@@ -163,7 +166,16 @@ namespace BlueCafe.App
             {
                 var candidate = await BlueCafe.Infrastructure.Pack.LoadAsync(path, packLoad.Token, progress);
                 if (generation != loadGeneration || !this) return;
-                Layout initial = Session?.Layout ?? (layoutPath == null ? new Layout { room = new Room { width = 12, depth = 12 } } : DocumentStore.LoadLayout(layoutPath));
+                CafeRecord startupCafe = null;
+                if (creatingSession && layoutPath == null)
+                {
+                    var empty = new Layout { name = "Empty room", room = new Room { width = 12, depth = 12 } };
+                    foreach (var id in new[] { "1", "2" })
+                        empty.instances.Add(new Instance { instanceId = Guid.NewGuid().ToString("N"), furnitureId = id });
+                    Placement.ValidateLayout(candidate.Catalog, empty, true);
+                    startupCafe = store.EnsureDefaultCafe(empty);
+                }
+                Layout initial = Session?.Layout ?? startupCafe?.layout ?? DocumentStore.LoadLayout(layoutPath);
                 Placement.ValidateLayout(candidate.Catalog, initial, true);
                 var previewCatalog = Session?.PreviewCatalog(candidate.Catalog);
                 if (previewCatalog != null && !previewCatalog.success) throw new Exception(previewCatalog.code + ": " + previewCatalog.message);
@@ -171,13 +183,12 @@ namespace BlueCafe.App
                 try
                 {
                     nextView.Sync(initial, Session?.Revision ?? 0);
-                    store.SaveSettings(new Settings { packRoot = candidate.Root });
-                    if (Session == null) { Session = new Session(candidate.Catalog, initial); Session.OpenDocument(initial); }
+                    var settings = store.LoadSettings(); settings.packRoot = candidate.Root; store.SaveSettings(settings);
+                    if (Session == null) { Session = new Session(candidate.Catalog, initial); Session.OpenDocument(initial, startupCafe != null); savedCafeId = startupCafe?.cafeId; }
                     else { var refreshed = Session.RefreshCatalog(candidate.Catalog); if (!refreshed.success) throw new Exception(refreshed.code + ": " + refreshed.message); }
                     DisposePageResources(); var oldView = View; Pack = candidate; View = nextView; View.Camera.backgroundColor = new Color(.88f, .95f, 1f); nextView = null; oldView?.Dispose(); ClearThumbnails();
                 }
                 finally { nextView?.Dispose(); }
-                if (creatingSession && layoutPath == null && Session.Layout.instances.Count == 0) { Apply(Session.Place("1", 0, 0)); Apply(Session.Place("2", 0, 0)); }
                 busy = false; ShowScreen(screen == "Settings" ? "Build" : screen); Refresh(); View.FrameRoom();
                 Message(candidate.Catalog.items.Count(i => i.available) + " of " + candidate.Catalog.items.Length + " assets available. Source files are read-only.");
                 OfferRecovery();
@@ -204,19 +215,19 @@ namespace BlueCafe.App
         }
         void Refresh()
         {
-            if (Session == null) return; CancelGesture(); selection.RemoveWhere(id => !Session.Layout.instances.Any(i => i.instanceId == id));
+            if (Session == null) return; invalidTransformField = false; CancelGesture(); selection.RemoveWhere(id => !Session.Layout.instances.Any(i => i.instanceId == id));
             View?.Sync(Session.Layout, Session.Revision); title.text = Session.Layout.name; saveState.Kind = Dirty ? "unsaved" : "check"; saveState.tooltip = Dirty ? "Unsaved changes" : "Saved";
             footerStats.text = Session.Layout.instances.Count + " items · " + Session.Layout.room.width + " × " + Session.Layout.room.depth + " m";
-            if (screen == "Build") { RefreshCards(); RefreshInspector(); } else if (screen == "Rooms") RefreshRooms(); lastEdit = Time.realtimeSinceStartup; if (Dirty && firstDirty == 0) firstDirty = lastEdit;
+            if (screen == "Build") { RefreshCards(); RefreshInspector(); } else if (screen == "Rooms") RefreshRooms(); RefreshCommandStates(); lastEdit = Time.realtimeSinceStartup; if (Dirty && firstDirty == 0) firstDirty = lastEdit;
         }
         void Apply(CommandResult result, bool selectResult = true)
         {
             if (!result.success) { Message(result.code + ": " + result.message); return; }
             if (selectResult && result.instanceIds != null && result.instanceIds.Length > 0) { selection.Clear(); foreach (var id in result.instanceIds) if (Session.Layout.instances.Any(i => i.instanceId == id && !Placement.IsRoomStyle(Session.Find(i.furnitureId)))) selection.Add(id); }
             selection.IntersectWith(Session.Layout.instances.Select(i => i.instanceId));
-            Refresh(); Message(Session.Layout.instances.Count + " objects • revision " + Session.Revision);
+            Refresh(); Message(showDiagnostics ? Session.Layout.instances.Count + " objects · revision " + Session.Revision : "Cafe updated.");
         }
-        void Message(string text) { if (footer != null) footer.text = text; }
+        void Message(string text) { if (footer != null) footer.text = text; UpdateOperationStatus(text); }
         void NewCafe()
         {
             var candidate = new Layout { room = new Room { width = 12, depth = 12 } }; var result = Session.OpenDocument(candidate); if (!result.success) throw new Exception(result.message);
@@ -227,7 +238,7 @@ namespace BlueCafe.App
             var oldId = documentId; documentId = Guid.NewGuid().ToString("N"); recoveredRevision = -1; firstDirty = 0;
             savedCafeId = cafeId; CancelGesture(); armed = null; selection.Clear(); Refresh(); Message("Opened " + Session.Layout.name + "."); TryClearRecovery(oldId);
         }
-        void Save() { SaveThen(null); }
+        void Save() { if (invalidTransformField) { Message("Correct the highlighted transform before saving."); return; } SaveThen(null); }
         void SaveThen(Action next)
         {
             if (Session == null) return;
@@ -309,10 +320,11 @@ namespace BlueCafe.App
         }
         void InputModal(string heading, string label, string value, Action<string> action)
         {
-            var panel = Modal(heading); var input = new TextField(label) { value = value }; panel.Add(input); var error = Label(panel, "", "error");
+            var panel = Modal(heading); var owner = modal; var input = new TextField(label) { value = value }; input.name = "dialogInput"; panel.Add(input); var error = Label(panel, "", "error"); error.name = "dialogError";
             if (label.EndsWith("path", StringComparison.Ordinal)) Button(panel, "Browse…", async () => { try { var chosen = await NativeDialogs.Choose(heading, save: heading.StartsWith("Export")); if (!string.IsNullOrEmpty(chosen) && modal != null) input.value = chosen; } catch (Exception e) { error.text = e.Message; } });
             var row = Box(panel, "row");
-            Button(row, "Continue", () => { try { string text = input.value; CloseModal(); action(text); } catch (Exception e) { InputModal(heading, label, input.value, action); Message(e.Message); } }, "primary"); Button(row, "Cancel", CloseModal); input.Focus();
+            string verb = heading.StartsWith("Save") ? "Save" : heading.StartsWith("Import") ? "Import" : heading.StartsWith("Export") ? "Export" : "Apply";
+            Button(row, verb, () => { try { string text = input.value; action(text); if (modal == owner) CloseModal(); } catch (Exception e) { error.text = e.Message; Message(e.Message); input.Focus(); } }, "primary").name = "dialogPrimary"; Button(row, "Cancel", CloseModal); input.Focus();
         }
         bool WantsToQuit()
         {
@@ -327,7 +339,10 @@ namespace BlueCafe.App
         }
         void Update()
         {
-            bridge?.Pump(Dispatch);
+            bridge?.Pump(Dispatch); PollSystemTheme();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (measureFrames) measuredFrames.Add(Time.unscaledDeltaTime);
+#endif
             catalogGesture?.ValidateRevision();
             if (!recoveryPending && Dirty && recoveredRevision != Session.Revision && Time.realtimeSinceStartup - lastRecoveryAttempt > 2 && (Time.realtimeSinceStartup - lastEdit > 2 || Time.realtimeSinceStartup - firstDirty > 30))
             {
@@ -336,6 +351,9 @@ namespace BlueCafe.App
                 catch (Exception e) { Message("Automatic recovery could not be written: " + e.Message); }
             }
             if (viewport != null && View != null && viewport.contentRect.width > 16) viewport.image = View.Render(Mathf.Clamp((int)viewport.contentRect.width, 32, 2048), Mathf.Clamp((int)viewport.contentRect.height, 32, 2048));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            PreviewRendered();
+#endif
         }
         void OfferRecovery()
         {
@@ -381,6 +399,7 @@ namespace BlueCafe.App
             // Open menus own navigation keys and do not edit the cafe behind them.
             if (StudioDropdown.IsMenuTarget(e.target)) return;
             if (modal != null) return;
+            if (Session != null && GlobalKey(e)) return;
             for (var element = e.target as VisualElement; element != null; element = element.parent) if (element is TextField || element is FloatField || element is IntegerField) return;
             if (Session == null || modal != null) return;
             if (e.ctrlKey || e.commandKey)
@@ -395,7 +414,7 @@ namespace BlueCafe.App
         Vector3? Floor(Vector2 world) => View?.FloorPoint(viewport.WorldToLocal(world), new Rect(Vector2.zero, viewport.contentRect.size));
         void CancelGesture()
         {
-            CancelRoomsGesture();
+            CancelWallMove(); CancelRoomsGesture();
             View?.ClearPlacementPreview();
             if (previewing && View != null && Session != null) View.Sync(Session.Layout, Session.Revision);
             if (armed != null && cards != null) foreach (var card in cards.Children()) card.EnableInClassList("selected", false);
@@ -406,17 +425,20 @@ namespace BlueCafe.App
         sealed class CanvasGesture : PointerManipulator
         {
             readonly StudioApp app;
+            Vector2 panStart; bool panMoved;
             public CanvasGesture(StudioApp app) { this.app = app; }
             protected override void RegisterCallbacksOnTarget() { target.RegisterCallback<PointerDownEvent>(Down); target.RegisterCallback<PointerMoveEvent>(Move); target.RegisterCallback<PointerUpEvent>(Up); target.RegisterCallback<PointerCaptureOutEvent>(Lost); }
             protected override void UnregisterCallbacksFromTarget() { target.UnregisterCallback<PointerDownEvent>(Down); target.UnregisterCallback<PointerMoveEvent>(Move); target.UnregisterCallback<PointerUpEvent>(Up); target.UnregisterCallback<PointerCaptureOutEvent>(Lost); }
             void Down(PointerDownEvent e)
             {
-                if (app.busy || app.modal != null || app.dragging || app.panning) return; app.pointerId = e.pointerId; app.lastPointer = e.position; target.Focus();
-                if (e.button == 1) { app.panning = true; target.CapturePointer(e.pointerId); e.StopPropagation(); return; }
-                if (e.button != 0) return; var p = app.Floor(e.position); if (p == null) return;
-                if (app.armed != null) { var furnitureId = app.armed; app.CompletePlacement(app.Session.Place(furnitureId, p.Value.x, p.Value.z)); return; }
+                if (app.modal != null || app.dragging || app.panning) return; app.pointerId = e.pointerId; app.lastPointer = e.position; target.Focus();
+                if (e.button == 1) { app.panning = true; panStart = e.position; panMoved = false; target.CapturePointer(e.pointerId); e.StopPropagation(); return; }
+                if (e.button != 0) return;
+                if (app.armed != null) { var furnitureId = app.armed; if (app.BuildItem(furnitureId)?.placement == "wall") { if (app.TryWallCandidate(furnitureId, e.position, out var candidate, out var validation)) { if (validation.success) app.CompletePlacement(app.CommitWallPlacement(candidate)); else app.Message(validation.code + ": " + validation.message); } else app.Message("Click a visible wall to set the mounting height."); } else { var floor = app.Floor(e.position); if (floor.HasValue) app.CompletePlacement(app.Session.Place(furnitureId, floor.Value.x, floor.Value.z)); } return; }
                 string id = app.View.Pick(target.WorldToLocal(e.position), new Rect(Vector2.zero, target.contentRect.size));
                 if (!e.shiftKey && !(app.buildMoveMode && id == null) && (id == null || !app.selection.Contains(id))) app.selection.Clear(); if (id != null) app.selection.Add(id); app.RefreshInspector();
+                if (id != null && app.BeginWallMove(e.position)) { target.CapturePointer(e.pointerId); e.StopPropagation(); return; }
+                var p = app.Floor(e.position); if (p == null) return;
                 if (id != null || (app.buildMoveMode && app.selection.Count > 0)) { app.dragging = true; app.moveStart = p.Value; app.gestureRevision = app.Session.Revision; app.gestureLayout = app.Session.Layout; target.CapturePointer(e.pointerId); }
                 e.StopPropagation();
             }
@@ -424,16 +446,17 @@ namespace BlueCafe.App
             {
                 if (e.pointerId != app.pointerId) return;
                 if (app.dragging && app.Session.Revision != app.gestureRevision) { app.CancelGesture(); app.Message("REVISION_CONFLICT: the cafe changed while moving furniture."); return; }
-                if (app.panning) { app.View.Pan((Vector2)e.position - app.lastPointer); app.lastPointer = e.position; }
-                if (!app.dragging) return; var p = app.Floor(e.position); if (p == null) return;
+                if (app.panning) { if (!panMoved && Vector2.Distance(panStart, e.position) >= 6) panMoved = true; if (panMoved) { app.View.Pan((Vector2)e.position - app.lastPointer); app.lastPointer = e.position; } return; }
+                if (!app.dragging) return; if (app.UpdateWallMove(e.position)) return; var p = app.Floor(e.position); if (p == null) return;
                 var preview = new Session(app.Pack.Catalog, app.gestureLayout); var result = preview.Move(app.selection, p.Value.x - app.moveStart.x, p.Value.z - app.moveStart.z);
                 if (result.success) { app.View.Sync(preview.Layout, app.gestureRevision); app.previewing = true; app.Message("Release to move selection."); } else { app.View.Sync(app.Session.Layout, app.Session.Revision); app.previewing = false; app.Message(result.code + ": " + result.message); }
             }
             void Up(PointerUpEvent e)
             {
                 if (e.pointerId != app.pointerId || (!app.dragging && !app.panning)) return;
+                if (app.CompleteWallMove(e.position, target.worldBound.Contains(e.position))) return;
                 bool move = app.dragging && target.worldBound.Contains(e.position); var p = move ? app.Floor(e.position) : null; float dx = p == null ? 0 : p.Value.x - app.moveStart.x, dz = p == null ? 0 : p.Value.z - app.moveStart.z; long revision = app.gestureRevision;
-                app.CancelGesture(); if (p != null && (Mathf.Abs(dx) > .001f || Mathf.Abs(dz) > .001f)) app.Apply(app.Session.Move(app.selection, dx, dz, revision));
+                bool context = app.panning && !panMoved && e.button == 1 && target.worldBound.Contains(e.position); app.CancelGesture(); if (context) app.FurnitureMenu(e.position); if (p != null && (Mathf.Abs(dx) > .001f || Mathf.Abs(dz) > .001f)) app.Apply(app.Session.Move(app.selection, dx, dz, revision));
             }
             void Lost(PointerCaptureOutEvent e) { if (e.pointerId == app.pointerId && (app.dragging || app.panning)) app.CancelGesture(); }
         }
@@ -448,7 +471,7 @@ namespace BlueCafe.App
         }
         Response DispatchCore(Request request)
         {
-            if (Session == null || Pack == null || busy) return new Response { code = "NOT_READY", message = "Configure and verify an asset folder first." };
+            if (Session == null || Pack == null) return new Response { code = "NOT_READY", message = "Configure and verify an asset folder first." };
             #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (request.command == "dev-ui") return ProbeUi(request.arguments ?? new Arguments());
 #endif
@@ -461,10 +484,19 @@ namespace BlueCafe.App
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 case "dev-ui": return ProbeUi(a);
 #endif
+                case "viewWall": View.FocusWall(a.wallId); return new Response { success = true, revision = Session.Revision };
                 case "status": return new Response { success = true, revision = Session.Revision, json = "{\"catalog\":" + Pack.Catalog.items.Length + ",\"available\":" + Pack.AvailableCount + ",\"renderUnavailable\":" + View.Unavailable.Count + ",\"packFingerprint\":\"" + Pack.Fingerprint + "\",\"instances\":" + Session.Layout.instances.Count + ",\"dirty\":" + (Session.IsDirty ? "true" : "false") + "}" };
                 case "catalog": return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(new Catalog { gridUnit = Pack.Catalog.gridUnit, items = Session.Search(a.query ?? "", a.category ?? "", a.theme ?? "").ToArray() }) };
                 case "layout": return new Response { success = true, revision = Session.Revision, json = JsonUtility.ToJson(Session.Layout, true) };
                 case "place": result = Session.Place(a.furnitureId, a.x, a.z, a.quarterTurns, a.elevation, expected); break;
+                case "setAreas": result = Session.SetAreas(a.areas, expected); break;
+                case "translateArea": result = Session.TranslateArea(a.areaId, a.dx, a.dz, expected); break;
+                case "resizeAreaCorner": result = Session.ResizeAreaCorner(a.areaId, a.vertexIndex, a.x, a.z, expected); break;
+                case "setAreaVertex": result = Session.SetAreaVertex(a.areaId, a.vertexIndex, a.x, a.z, expected); break;
+                case "setExtent": result = Session.SetExtent(a.centerX, a.centerZ, a.extentWidth, a.extentDepth, expected); break;
+                case "setWallAttachment": result = Session.SetWallAttachment(a.name, a.wallId, a.along, a.elevation, expected); break;
+                case "placeOnWall": result = Session.PlaceOnWall(a.furnitureId, a.wallId, a.along, a.elevation, expected); break;
+                case "setWallOpenings": result = Session.SetWallOpenings(a.openings, expected); break;
                 case "move": result = Session.Move(a.instanceIds, a.dx, a.dz, expected); break;
                 case "rotate": result = Session.Rotate(a.instanceIds, a.steps, expected); break;
                 case "duplicate": result = Session.Duplicate(a.instanceIds, a.dx, a.dz, expected); break;

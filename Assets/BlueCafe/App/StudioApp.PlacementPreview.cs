@@ -64,7 +64,7 @@ namespace BlueCafe.App
             }
             void Down(PointerDownEvent e)
             {
-                if (e.button != 0 || !item.available || app.busy || app.modal != null || app.View == null || app.Session == null) return;
+                if (e.button != 0 || !item.available || app.modal != null || app.View == null || app.Session == null) return;
                 app.CancelGesture();
                 try
                 {
@@ -86,7 +86,7 @@ namespace BlueCafe.App
                 {
                     app.CancelGesture(); app.Message("Cafe changed during the drag. Drag the item again.");
                 }
-                else if (held && (app.busy || app.modal != null || app.screen != "Build"))
+                else if (held && (app.modal != null || app.screen != "Build"))
                 {
                     app.CancelGesture(); app.Message("Placement cancelled.");
                 }
@@ -95,15 +95,24 @@ namespace BlueCafe.App
             {
                 if (!held || e.pointerId != capturedId) return;
                 moved |= Vector2.Distance(start, e.position) >= 8;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                app.PreviewInputStarted();
+#endif
                 UpdatePreview(e.position); e.StopPropagation();
             }
             void UpdatePreview(Vector2 pointer)
             {
                 ValidateRevision(); if (!held) return;
                 candidate = null; candidateValid = false;
-                if (app.screen != "Build" || app.busy || app.modal != null || app.viewport == null || !app.viewport.worldBound.Contains(pointer))
+                if (app.screen != "Build" || app.modal != null || app.viewport == null || !app.viewport.worldBound.Contains(pointer))
                 {
                     app.View.ClearPlacementPreview(); return;
+                }
+                if (item.placement == "wall")
+                {
+                    if (app.TryWallCandidate(item.id, pointer, out candidate, out var validation)) { candidateValid = validation.success; app.View.ShowPlacementPreview(candidate, candidateValid); app.Message(candidateValid ? "Release to place on " + candidate.wallId + " at " + candidate.position.y.ToString("0.##") + " m." : validation.code + ": " + validation.message); }
+                    else app.View.ClearPlacementPreview();
+                    return;
                 }
                 var point = app.Floor(pointer);
                 if (!point.HasValue) { app.View.ClearPlacementPreview(); return; }
@@ -155,11 +164,11 @@ namespace BlueCafe.App
                 e.StopPropagation();
                 if (drop && placed != null)
                 {
-                    app.CompletePlacement(app.Session.Place(item.id, placed.position.x, placed.position.z, placed.quarterTurns, placed.position.y, expected));
+                    app.CompletePlacement(item.placement == "wall" ? app.CommitWallPlacement(placed, expected) : app.Session.Place(item.id, placed.position.x, placed.position.z, placed.quarterTurns, placed.position.y, expected));
                 }
                 else if (arm)
                 {
-                    app.armed = item.id; app.RefreshCards(); app.viewport?.Focus(); app.Message("Click in the cafe to place " + item.name + ".");
+                    app.armed = item.id; app.RefreshCards(); app.viewport?.Focus(); app.Message(app.PlacementHint(item));
                 }
                 else if (!drop) app.Message("Placement cancelled.");
             }

@@ -1,56 +1,69 @@
 # BlueCafe
 
-An independent Unity cafe designer with a standalone desktop app and retained Editor tools.
+An independent Unity cafe designer with standalone Linux and Windows apps and retained Editor tools.
 
-The personal Linux alpha supports furnishing, move/rotate/copy/delete, undo/redo, catalog filters, interior selection, saved cafes, portable layouts, recovery and a local agent bridge. **Rooms remains experimental.** Full standalone and cross-platform acceptance are still open.
+The beta adds a Rooms workspace, named floor areas, wall decoration height and movement, complete asset browsing, editable presets and a saved startup cafe. Floors at 40×40 and larger retain their original appearance. The public packages contain the app and required runtime libraries; supply a separate compatible prepared asset pack.
 
-## Run the alpha
+## Run the beta
 
-Download the Linux x86_64 archive from [Releases](https://github.com/Millennium-GDD/bluecafe/releases), extract it and run `launch.sh`. Keep the extracted folder together. Unity Editor and Python are not required to run the app. Optional native file dialogs use `zenity`; typed paths are available.
+Download the package for your platform from [Releases](https://github.com/Millennium-GDD/bluecafe/releases), and extract the entire archive.
 
-Select your existing prepared asset folder in Settings, or launch with:
+- **Linux x86_64:** run `launch.sh`. Optional native file dialogs use `zenity`; typed paths also work.
+- **Windows x86_64:** run `BlueCafe.exe`. Enter folder/file paths in the editable fields; native Windows file dialogs are not implemented yet.
+
+Unity Editor and Python are not required to run either app. Select your prepared asset folder in Settings, or pass it when launching:
 
 ```sh
-BLUECAFE_ASSET_PACK=/path/to/prepared-pack ./launch.sh
+./launch.sh --asset-pack /path/to/prepared-pack
 ```
 
-Game models, textures, thumbnails and catalog data are **not included** in the repository or release. The app requires a separately supplied compatible pack; it cannot download or extract game content. See [prepared pack contract](docs/PREPARED-PACK.md).
+```powershell
+.\BlueCafe.exe --asset-pack "C:\BlueCafeAssets"
+```
 
-Save and close an older BlueCafe instance before opening another against the same data folder. On Linux, saved cafes, settings and recovery use `~/.config/unity3d/BlueCafe/BlueCafe`. Use `--data-path /path/to/separate-data` for an independent instance.
+Game models, textures, thumbnails and catalog data are **not included** in this repository or release. BlueCafe cannot download or extract game content. The [prepared pack contract](docs/PREPARED-PACK.md) describes compatible user-supplied inputs.
+
+Save and close an older BlueCafe instance before opening another against the same data folder. Keep a backup when trying a beta. On Linux, cafes/settings/recovery use `~/.config/unity3d/BlueCafe/BlueCafe`; Windows uses Unity's application data directory for `BlueCafe/BlueCafe`. `--data-path` selects an independent profile. Existing v1 layouts remain readable; geometry edits migrate to v2, which the old alpha cannot read.
+
+First startup saves an **Empty room** in My cafes and opens it clean. Select a saved cafe and choose **Open at startup** to change the default.
+
+## Controls
+
+Drag a catalog item into the room, or click it and choose a placement. Drag selected furniture to move; **R** rotates, **Ctrl+D** duplicates, **Delete** removes, **Ctrl+Z** undoes and **Ctrl+Shift+Z** redoes. Shift adds to selection. Right-drag pans, scroll zooms, and **Fit room** restores framing. Escape closes a popup or cancels the current gesture.
+
+Select a wall decoration to change its mounting-center **Height (m)**, raise/lower it by one grid step, or drag it along/up the wall and onto another visible wall. Automatic floor/wall grids appear during movement; the manual Grid control remains available.
+
+Rooms edits the cafe enclosure and named polygon areas. Named areas classify flooring and wallpaper; they do not create internal physical partitions. Presets open on double-click and can be renamed. Build also supports cafe naming.
 
 ## Develop
 
-Install Unity **6000.2.6f2** with Linux Build Support and your own Unity license. Clone this repository, then open its root through Unity Hub. Unity resolves the packages declared in `Packages/manifest.json`.
+Use Unity **6000.2.6f2**, your own Unity license and the platform's build support module. Open this repository through Unity Hub; Unity resolves `Packages/manifest.json`. Windows builds use Windows Build Support (Mono).
 
-The optional Python helpers use only the standard library. Editor helpers also require Unity CLI on PATH:
+Optional Python helpers use the standard library; Editor helpers require Unity CLI on PATH:
 
 ```sh
 python3 bin/open.py
 python3 bin/feedback.py recompile
 python3 bin/feedback.py tests
+./launch-latest.sh
 ```
 
-The Editor designer is at **Window → BlueCafe → Designer**. The Linux development build menu is **BlueCafe → Build Linux runtime spine**. The release builder is `BlueCafe.App.Editor.StandaloneBuild.BuildAlphaTo(output, evidence)`, invoked from the Editor or through a scheduled Unity CLI evaluation. Build outputs are ignored by Git.
+`launch-latest.sh` starts the newest complete Linux build in the checkout. The Editor designer is at **Window → BlueCafe → Designer**. A release build can be scheduled in the live Editor:
 
-## Project structure
+```csharp
+BlueCafe.App.Editor.StandaloneBuild.ScheduleTo(
+    "Builds/Linux-Beta5/BlueCafe.x86_64", "evidence/linux-beta5",
+    "0.1.0-beta.5", false);
+```
 
-| Directory | Responsibility |
-| --- | --- |
-| `Assets/BlueCafe/Core` | Engine-independent layout, placement, session and undo rules |
-| `Assets/BlueCafe/Infrastructure` | Read-only pack validation and atomic document storage |
-| `Assets/BlueCafe/Unity` | Original-asset runtime rendering and projection |
-| `Assets/BlueCafe/App` | Desktop UI and standalone build entry points |
-| `Assets/BlueCafe/Agent` | Authenticated loopback command bridge |
-| `Assets/BlueCafe/Editor` | Editor designer and reconstruction diagnostics |
-| `Assets/BlueCafe/Tests` | EditMode tests with synthetic fixtures |
-| `bin` | Optional Editor and standalone agent helpers |
+See [Windows build instructions](docs/WINDOWS-BUILD.md) for Windows builds and packaging. Build outputs and local data are ignored by Git.
 
-Read [verification requirements](docs/VERIFICATION.md) and [integration contracts](docs/CONTRACTS.md) before changing implementation boundaries. Local acquisition evidence and reference captures are deliberately excluded. Some Editor example/reconstruction diagnostics require those local files and report unavailable when they are absent.
+## Verification and limitations
 
-## Controls
+Beta.5 passed 196 EditMode tests. Linux executable checks cover original assets, save/reopen, Rooms resizing with undo/redo, styled/offset rooms and default floors through 1,000×1,000. Windows cross-build and package integrity checks passed; Windows execution, rendering, input, recovery and upgrade behavior remain to be tested on Windows. Clean-machine, human timing/visual approval, accessibility and full performance budgets remain open. No macOS package is provided.
 
-Drag a catalog item into the room, or click it and choose a placement. Drag selected furniture to move; **R** rotates, **Ctrl+D** duplicates, **Delete** removes, **Ctrl+Z** undoes and **Ctrl+Shift+Z** redoes. Shift adds to selection. Right-drag pans, scroll zooms, and Frame room restores framing. Escape closes the topmost popup or cancels the current gesture.
+Read [verification requirements](docs/VERIFICATION.md) and [integration contracts](docs/CONTRACTS.md) before changing implementation boundaries. Local acquisition evidence and reference captures are excluded. Editor reconstruction diagnostics that need those local files report unavailable when they are absent.
 
 ## Notices
 
-BlueCafe is unofficial and is not endorsed by Blue Archive rights holders. Source publication does not grant rights to separately supplied game content. See [NOTICE.md](NOTICE.md). No project-wide open-source license has been selected; the bundled Noto Sans font retains its SIL Open Font License 1.1 license.
+BlueCafe is unofficial and is not endorsed by Blue Archive rights holders. Publication does not grant rights to separately supplied content. See [NOTICE.md](NOTICE.md). No project-wide open-source license has been selected. Noto Sans, embedded fonts, Unity runtime and package components retain their respective licenses and notices.

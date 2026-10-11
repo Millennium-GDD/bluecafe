@@ -9,7 +9,11 @@ using UnityEngine;
 
 namespace BlueCafe.Infrastructure
 {
-    [Serializable] public sealed class Settings { public int version = 1; public string packRoot = ""; }
+    [Serializable] public sealed class Settings
+    {
+        public int version = 1;
+        public string packRoot = "", defaultCafeId = "", emptyCafeId = "";
+    }
     [Serializable] public sealed class CafeRecord
     {
         public int version = 1;
@@ -65,8 +69,9 @@ namespace BlueCafe.Infrastructure
         // This layer accepts known unavailable instances and never rewrites IDs/transforms.
         static void ValidatePortable(Layout layout)
         {
-            if (layout == null || layout.version != 1 || layout.room == null || layout.instances == null)
-                throw new DocumentException("INVALID_LAYOUT", "Expected a version 1 layout with room and instances.");
+            if (layout == null || (layout.version != 1 && layout.version != 2) || layout.room == null || layout.instances == null)
+                throw new DocumentException("INVALID_LAYOUT", "Expected a version 1 or 2 layout with room and instances.");
+            try { Geometry.Validate(layout); } catch(ValidationException e) { throw new DocumentException(e.code,e.Message); }
             var room = layout.room;
             if (!Finite(room.width) || !Finite(room.depth) || !Finite(room.wallHeight) || !Finite(room.grid) || room.width <= 0 || room.depth <= 0 || room.wallHeight <= 0 || room.grid <= 0 || room.width > 1000 || room.depth > 1000 || room.grid > Math.Min(room.width, room.depth))
                 throw new DocumentException("INVALID_ROOM", "Room dimensions and grid must be finite, positive and supported.");
@@ -77,17 +82,22 @@ namespace BlueCafe.Infrastructure
                     throw new DocumentException("INVALID_INSTANCE", "Instances need unique nonempty instance IDs and furniture IDs.");
                 if (!Finite(instance.position.x) || !Finite(instance.position.y) || !Finite(instance.position.z) || instance.position.y < 0 || instance.position.y > room.wallHeight)
                     throw new DocumentException("INVALID_TRANSFORM", "Instance position must be finite with a valid elevation.");
+                if (!Finite(instance.wallAlong)) throw new DocumentException("INVALID_ATTACHMENT", "Wall along coordinate must be finite.");
                 if (instance.quarterTurns < 0 || instance.quarterTurns > 3) throw new DocumentException("INVALID_ROTATION", "quarterTurns must be 0, 1, 2 or 3.");
             }
         }
         static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
         static void InspectLayoutJson(string json, string prefix = "")
         {
+            int portableVersion=0; HashSet<string> layoutKeys=null, roomKeys=null;
             StrictJson.Inspect(json, (path, keys) =>
             {
                 path = LayoutJsonPath(path, prefix); if (path == null) return;
-                if (path == "") StrictJson.Require(keys, "version", "room", "instances");
-                else if (path == ".room") StrictJson.Require(keys, "width", "depth", "wallHeight", "grid");
+                if (path == "") { layoutKeys=keys; StrictJson.Require(keys, "version", "room", "instances"); }
+                else if (path == ".room") {roomKeys=keys; StrictJson.Require(keys, "width", "depth", "wallHeight", "grid");}
+                else if(Regex.IsMatch(path,@"^\.areas\[\d+\]$")) StrictJson.Require(keys,"id","name","vertices");
+                else if(Regex.IsMatch(path,@"^\.areas\[\d+\]\.vertices\[\d+\]$")) StrictJson.Require(keys,"x","y","z");
+                else if(Regex.IsMatch(path,@"^\.openings\[\d+\]$")) StrictJson.Require(keys,"id","wallId","along","width","bottom","height");
                 else if (Regex.IsMatch(path, @"^\.instances\[\d+\]\.position$")) StrictJson.Require(keys, "x", "y", "z");
                 else if (Regex.IsMatch(path, @"^\.instances\[\d+\]$")) StrictJson.Require(keys, "instanceId", "furnitureId", "position", "quarterTurns");
             }, (path, kind) =>
@@ -96,19 +106,27 @@ namespace BlueCafe.Infrastructure
                 if (path == "" && kind != '{') throw new FormatException("Expected layout object.");
                 string member = path.Substring(path.LastIndexOf('.') + 1);
                 bool root = path == ".version";
-                bool roomNumber = path.StartsWith(".room.", StringComparison.Ordinal) && new[] { "width", "depth", "wallHeight", "grid" }.Contains(member);
+                bool roomNumber = path.StartsWith(".room.", StringComparison.Ordinal) && new[] { "width", "depth", "wallHeight", "grid", "centerX", "centerZ" }.Contains(member);
+                bool geometryNumber = Regex.IsMatch(path,@"^\.areas\[\d+\]\.vertices\[\d+\]\.(x|y|z)$") || Regex.IsMatch(path,@"^\.openings\[\d+\]\.(along|width|bottom|height)$") || Regex.IsMatch(path,@"^\.instances\[\d+\]\.wallAlong$");
+                bool geometryString = Regex.IsMatch(path,@"^\.areas\[\d+\]\.(id|name|color|flooringId|wallpaperId)$") || Regex.IsMatch(path,@"^\.openings\[\d+\]\.(id|wallId)$") || Regex.IsMatch(path,@"^\.instances\[\d+\]\.wallId$");
+                if(Regex.IsMatch(path,@"^\.instances\[\d+\]\.legacyWallFootprint$") && kind!='t' && kind!='f') throw new FormatException("Expected boolean " + path);
+                if(geometryString && kind != '\"') throw new FormatException("Expected string " + path);
+                if((path==".areas" || path==".openings" || Regex.IsMatch(path,@"^\.areas\[\d+\]\.vertices$")) && kind!='[') throw new FormatException("Expected geometry array " + path);
+                if((Regex.IsMatch(path,@"^\.(areas|openings)\[\d+\]$") || Regex.IsMatch(path,@"^\.areas\[\d+\]\.vertices\[\d+\]$")) && kind!='{') throw new FormatException("Expected geometry object " + path);
                 bool positionNumber = Regex.IsMatch(path, @"^\.instances\[\d+\]\.(quarterTurns|position\.(x|y|z))$");
                 bool instanceMember = Regex.IsMatch(path, @"^\.instances\[\d+\]\.[^.\[]+$");
-                if ((root || roomNumber || positionNumber) && kind != '-' && (kind < '0' || kind > '9')) throw new FormatException("Expected numeric member " + path + ".");
+                if ((root || roomNumber || positionNumber || geometryNumber) && kind != '-' && (kind < '0' || kind > '9')) throw new FormatException("Expected numeric member " + path + ".");
                 if ((path == ".room" || (instanceMember && member == "position")) && kind != '{') throw new FormatException("Expected object " + path + ".");
                 if (path == ".instances" && kind != '[') throw new FormatException("Expected instances array.");
                 if (((instanceMember && (member == "instanceId" || member == "furnitureId")) || path == ".name") && kind != '"') throw new FormatException("Expected string " + path + ".");
             }, (path, number) =>
             {
                 path = LayoutJsonPath(path, prefix); if (path == null) return;
-                if (path == ".version" && number != "1") throw new DocumentException("UNSUPPORTED_LAYOUT_VERSION", "Only portable layout version 1 is supported.");
+                if(path==".version") int.TryParse(number,out portableVersion);
+                if (path == ".version" && number != "1" && number != "2") throw new DocumentException("UNSUPPORTED_LAYOUT_VERSION", "Only portable layout versions 1 and 2 are supported.");
                 if (Regex.IsMatch(path, @"^\.instances\[\d+\]\.quarterTurns$") && !int.TryParse(number, out _)) throw new FormatException("quarterTurns must be an integer.");
             });
+            if(portableVersion==2) { StrictJson.Require(layoutKeys,"areas","openings");StrictJson.Require(roomKeys,"centerX","centerZ"); }
         }
         static string LayoutJsonPath(string path, string prefix)
         {
@@ -138,6 +156,37 @@ namespace BlueCafe.Infrastructure
                 return Directory.GetFiles(CafeFolder, "*.json").Select(ReadCafe).OrderBy(c => c.name, StringComparer.OrdinalIgnoreCase).ToArray();
             }
         }
+        public CafeRecord EnsureDefaultCafe(Layout emptyLayout)
+        {
+            var starter = ParseLayout(SerializeLayout(emptyLayout));
+            if (starter.instances.Any(i => i.furnitureId != "1" && i.furnitureId != "2"))
+                throw new DocumentException("EMPTY_LAYOUT_REQUIRED", "The startup starter may contain only the original floor and wall styles, with no furniture.");
+            lock (gate)
+            {
+                var settings = LoadSettings();
+                var selected = FindSavedCafe(settings.defaultCafeId);
+                if (selected != null) return selected;
+                selected = FindSavedCafe(settings.emptyCafeId);
+                if (selected == null)
+                {
+                    var names = new HashSet<string>(ListCafes().Select(c => c.name), StringComparer.OrdinalIgnoreCase);
+                    starter.name = "Empty room";
+                    for (int suffix = 2; names.Contains(starter.name); suffix++) starter.name = "Empty room (" + suffix + ")";
+                    selected = SaveCafe(starter);
+                    settings.emptyCafeId = selected.cafeId;
+                }
+                settings.defaultCafeId = selected.cafeId;
+                SaveSettings(settings);
+                return selected;
+            }
+        }
+        CafeRecord FindSavedCafe(string cafeId)
+        {
+            if (!Guid.TryParseExact(cafeId, "N", out _)) return null;
+            string path = CafePath(cafeId);
+            if (!File.Exists(path)) return null;
+            return ReadCafe(path);
+        }
         public CafeRecord SaveCafe(Layout layout, string cafeId = null)
         {
             string portable = SerializeLayout(layout);
@@ -154,6 +203,18 @@ namespace BlueCafe.Infrastructure
             }
         }
         public Layout LoadCafe(string cafeId) { lock (gate) return ReadCafe(CafePath(cafeId)).layout; }
+        public CafeRecord RenameCafe(string cafeId, string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) throw new DocumentException("NAME_REQUIRED", "Choose a name for this cafe.");
+            lock (gate)
+            {
+                var record = ReadCafe(CafePath(cafeId));
+                name = name.Trim();
+                if (record.name == name) return record;
+                record.layout.name = name;
+                return SaveCafe(record.layout, cafeId);
+            }
+        }
         public void DeleteCafe(string cafeId) { lock (gate) File.Delete(CafePath(cafeId)); }
         string CafePath(string id) { ValidateIdentity(id); return Path.Combine(CafeFolder, id + ".json"); }
         static void ValidateIdentity(string id)

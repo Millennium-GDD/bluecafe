@@ -21,6 +21,7 @@ namespace BlueCafe.App
         {
             buildSelectTool?.EnableInClassList("active", !buildMoveMode);
             buildMoveTool?.EnableInClassList("active", buildMoveMode);
+            RefreshCommandStates();
             buildGridTool?.EnableInClassList("active", buildGrid);
         }
         Catalog buildCatalog;
@@ -34,7 +35,7 @@ namespace BlueCafe.App
         {
             if (topCategory == "Interior") topCategory = "Furniture";
             var row = Box(workspace, "body"); row.AddToClassList("build-body");
-            var catalog = Box(row, "catalog"); catalog.AddToClassList("build-catalog"); Label(catalog, "Catalog", "heading");
+            var catalog = Box(row, "catalog"); catalog.name = "catalogPanel"; catalog.AddToClassList("build-catalog"); Label(catalog, "Catalog", "heading");
             buildCategoryButtons.Clear(); var tabs = Box(catalog, "build-segments");
             foreach (var cat in new[] { "Furniture", "Decoration" })
             {
@@ -53,26 +54,24 @@ namespace BlueCafe.App
             var second = Box(filters, "build-filter"); Label(second, "Theme");
             theme = StudioDropdown.Create<string>(Pack.Catalog.items.Select(i => i.theme).Where(s => !string.IsNullOrEmpty(s)).Distinct().OrderBy(s => s).Prepend("All").ToList(), 0); theme.name = "buildTheme"; second.Add(theme);
             category.RegisterValueChangedCallback(_ => { limit = 60; RefreshCards(); }); theme.RegisterValueChangedCallback(_ => { limit = 60; RefreshCards(); });
+            Button(catalog, "Reset filters", ResetBuildFilters, "build-reset").name = "buildReset";
             catalogCount = Label(catalog, "", "build-catalog-count");
-            var scroll = new ScrollView { horizontalScrollerVisibility = ScrollerVisibility.Hidden }; scroll.AddToClassList("build-card-scroll"); catalog.Add(scroll); cards = Box(scroll, "cards");
+            var scroll = new ScrollView { name = "buildCatalogScroll", horizontalScrollerVisibility = ScrollerVisibility.Hidden }; scroll.AddToClassList("build-card-scroll"); catalog.Add(scroll); cards = Box(scroll, "cards");
             buildMore = Button(catalog, "Show more", () => { limit += 60; RefreshCards(); }, "build-more");
-            var middle = Box(row, "canvas-column"); middle.AddToClassList("build-canvas");
+            var middle = Box(row, "canvas-column"); middle.name = "buildCanvas"; buildCanvas = middle; middle.style.overflow = Overflow.Hidden; middle.AddToClassList("build-canvas");
             viewport = new Image { name = "buildViewport", scaleMode = ScaleMode.StretchToFill, focusable = true }; viewport.AddToClassList("viewport"); middle.Add(viewport);
             viewport.AddManipulator(new CanvasGesture(this)); viewport.RegisterCallback<WheelEvent>(e => { View.Zoom(e.delta.y); e.StopPropagation(); });
             buildOverlay = new BuildSelectionOverlay(this); middle.Add(buildOverlay);
             var floating = Box(middle, "build-floating-tools"); floating.pickingMode = PickingMode.Ignore; var tools = Box(floating, "build-tools");
-            buildSelectTool = Tool(tools, "Select", "select", () => { CancelGesture(); viewport.Focus(); RefreshCards(); }, "active"); buildSelectTool.name = "buildSelect";
-            buildMoveTool = Tool(tools, "Move", "move", () => { CancelGesture(); buildMoveMode = true; RefreshBuildTools(); viewport.Focus(); Message("Drag furniture or the selected group's floor area to move it. Shift adds furniture to the selection."); }); buildMoveTool.name = "buildMove";
-            Tool(tools, "Rotate (90°)", "rotate", () => RotateSelection()).name = "buildRotate";
+            buildSelectTool = Tool(tools, "0 selected", "select", () => { CancelGesture(); viewport.Focus(); RefreshCards(); }, "active"); buildSelectTool.name = "buildSelect"; buildSelectTool.tooltip = "Select and drag furniture. Shift adds to selection."; selectionLabel = buildSelectTool.Q<Label>(className: "tool-label"); selectionLabel.name = "buildSelectionCount";
+            IconButton(tools, "rotate", () => RotateSelection(), "Rotate selection clockwise 90° (R)").name = "buildRotate";
             Box(tools, "build-tool-separator");
-            buildGridTool = Tool(tools, "Grid", "grid", () => { buildGrid = !buildGrid; RefreshBuildTools(); buildOverlay.MarkDirtyRepaint(); }); buildGridTool.name = "buildGrid"; buildGridTool.tooltip = "Keep the grid visible after placing or moving furniture"; RefreshBuildTools();
-            var snap = Tool(tools, "Snap", "snap", () => { }, "active"); snap.SetEnabled(false); snap.tooltip = "Placement always snaps to the cafe grid.";
-            Box(tools, "build-tool-separator"); selectionLabel = Label(tools, "0 selected", "build-selection-count");
-            IconButton(tools, "duplicate", () => Apply(Session.Duplicate(selection)), "Duplicate selection (Ctrl+D)");
-            IconButton(tools, "delete", () => Apply(Session.Delete(selection)), "Delete selection");
+            buildGridTool = IconButton(tools, "grid", () => { buildGrid = !buildGrid; RefreshBuildTools(); buildOverlay.MarkDirtyRepaint(); }, "Keep grid visible"); buildGridTool.name = "buildGrid"; buildGridTool.tooltip = "Keep the grid visible after moving or placing furniture. Floor moves snap to half a tile; wall moves snap to one tile."; RefreshBuildTools();
+            IconButton(tools, "duplicate", () => Apply(Session.Duplicate(selection)), "Duplicate selection (Ctrl+D)").name = "buildDuplicate";
+            IconButton(tools, "delete", () => Apply(Session.Delete(selection)), "Delete selection").name = "buildDelete";
             var viewTools = Box(middle, "build-view-tools"); Tool(viewTools, "Fit room", "frame", () => View.FrameRoom());
             IconButton(viewTools, "zoom-out", () => View.Zoom(2), "Zoom out"); IconButton(viewTools, "zoom-in", () => View.Zoom(-2), "Zoom in");
-            inspector = Box(row, "inspector"); inspector.AddToClassList("build-inspector"); RefreshCards(); RefreshInspector();
+            inspector = Box(row, "inspector"); inspector.name = "inspectorPanel"; inspector.AddToClassList("build-inspector"); ConfigureBuildPanels(row, catalog, middle, inspector); ConfigureFloatingToolbar(floating, tools); RefreshCards(); RefreshInspector();
         }
         static bool BuildDecoration(Item item) => item.placement == "wall" || item.category == "FloorDecoration" || item.category == "Prop" || item.category == "Trophy" || item.category == "Decoration";
         bool InBuildCategory(Item item) => !Placement.IsRoomStyle(item) && (topCategory == "Decoration" ? BuildDecoration(item) : !BuildDecoration(item));
@@ -99,36 +98,62 @@ namespace BlueCafe.App
             if (items.Length == 0) { Label(cards, "No items match. Try another search or clear the filters.", "build-empty-message"); return; }
             foreach (var item in visible)
             {
-                var card = Box(cards, "card"); card.EnableInClassList("selected", item.id == armed);
+                var card = Box(cards, "card"); card.name = "build-card-" + item.id; CopyAssetDetails(card, item); card.EnableInClassList("selected", item.id == armed);
                 var texture = Thumbnail(item); var img = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit }; img.AddToClassList("thumb"); card.Add(img);
                 Label(card, item.name, "card-name"); card.tooltip = item.id + " • " + item.name + "\n" + (item.available ? "Click to place; drag into cafe" : Pack.Availability(item.id).Reason);
-                if (!item.available) Label(card, "Unavailable", "error"); else if (texture == null) Label(card, "Image unavailable", "muted"); card.AddManipulator(new CatalogGesture(this, item)); card.focusable = item.available; card.RegisterCallback<KeyDownEvent>(e => { if (item.available && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.Space)) { armed = item.id; RefreshCards(); viewport?.Focus(); Message("Click in the cafe to place " + item.name + "."); e.StopPropagation(); } });
+                if (!item.available) Label(card, "Unavailable", "error"); else if (texture == null) Label(card, "Image unavailable", "muted"); card.AddManipulator(new CatalogGesture(this, item)); card.focusable = item.available; card.RegisterCallback<KeyDownEvent>(e => { if (item.available && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.Space)) { armed = item.id; RefreshCards(); viewport?.Focus(); Message(PlacementHint(item)); e.StopPropagation(); } });
             }
         }
         void RefreshInspector()
         {
-            if (inspector == null || screen != "Build") return; inspector.Clear(); Label(inspector, "Transform", "heading"); if (selectionLabel != null) selectionLabel.text = selection.Count + " selected";
+            if (inspector == null || screen != "Build") return; inspector.Clear(); Label(inspector, selection.Count > 0 ? "Transform" : "No selection", "heading"); if (selectionLabel != null) selectionLabel.text = selection.Count + " selected";
             var scroll = new ScrollView { horizontalScrollerVisibility = ScrollerVisibility.Hidden }; scroll.AddToClassList("build-inspector-scroll"); inspector.Add(scroll);
             var selected = Session.Layout.instances.Where(i => selection.Contains(i.instanceId)).ToArray();
             if (selected.Length > 0)
             {
                 Label(scroll, selected.Length == 1 ? (BuildItem(selected[0].furnitureId)?.name ?? "Unavailable item") : selected.Length + " items selected", "build-item-name");
+                if (!(selected.Length == 1 && DrawWallInspector(scroll, selected[0])))
+                {
+                if (selected.All(i => BuildItem(i.furnitureId)?.placement == "floor")) Label(scroll, "Floor furniture · rests on the floor. Wall decorations have separate height controls.", "rooms-note");
                 var center = BuildSelectionCenter(selected); Label(scroll, "Position (m)", "build-form-label"); var position = Box(scroll, "build-position-row");
                 var x = new FloatField("X") { name = "buildX", value = center.x, isDelayed = true }; x.AddToClassList("build-position-first"); position.Add(x);
                 var z = new FloatField("Z") { name = "buildZ", value = center.y, isDelayed = true }; position.Add(z);
-                x.RegisterValueChangedCallback(e => Safe(() => Apply(Session.Move(selection, e.newValue - center.x, 0)))); z.RegisterValueChangedCallback(e => Safe(() => Apply(Session.Move(selection, 0, e.newValue - center.y))));
+                x.RegisterValueChangedCallback(e => Safe(() => ApplyTransform(Session.Move(selection, e.newValue - center.x, 0)))); z.RegisterValueChangedCallback(e => Safe(() => ApplyTransform(Session.Move(selection, 0, e.newValue - center.y))));
+                Label(scroll, "", "error").name = "buildTransformError";
                 Label(scroll, "Rotation", "build-form-label"); var rotationRow = Box(scroll, "build-rotation-row");
                 var turns = selected.Select(i => i.quarterTurns).Distinct().ToArray(); var directions = new List<string> { "0° (North)", "90° (East)", "180° (South)", "270° (West)" };
                 if (turns.Length > 1) directions.Insert(0, "Mixed"); var rotation = StudioDropdown.Create<string>(directions, turns.Length == 1 ? turns[0] : 0); rotation.name = "buildRotation"; rotationRow.Add(rotation); rotation.SetEnabled(turns.Length == 1); rotation.tooltip = turns.Length == 1 ? "Set the selection orientation" : "Mixed orientations. Use the rotate buttons to rotate the rigid group.";
                 rotation.RegisterValueChangedCallback(e => { var desired = directions.IndexOf(e.newValue) - (turns.Length > 1 ? 1 : 0); if (desired >= 0) Safe(() => RotateSelection(desired - selected[0].quarterTurns)); });
                 IconButton(rotationRow, "rotate", () => RotateSelection(1), "Rotate clockwise 90°").name = "buildRotateClockwise"; IconButton(rotationRow, "undo", () => RotateSelection(-1), "Rotate counterclockwise 90°").name = "buildRotateCounterclockwise";
+                }
             }
             else Label(scroll, "Select furniture to edit its position. Shift adds items to a group.", "build-empty-message");
-            var room = Box(scroll, "build-section"); Label(room, "Room", "subheading"); var values = Box(room, "build-room-values");
+            var room = InspectorFoldout(scroll, "Cafe · " + Session.Layout.room.width.ToString("0.##") + " × " + Session.Layout.room.depth.ToString("0.##") + " m", false); Label(room, Session.Layout.name, "build-cafe-name").name = "buildCafeName";
+            Tool(room, "Rename cafe", "pen", RenameCafe, "build-rename").name = "buildRenameCafe";
+            var values = Box(room, "build-room-values");
             var width = Box(values, "build-room-value"); Label(width, "Width (m)"); Label(width, Session.Layout.room.width.ToString("0.##"), "build-room-number");
             var depth = Box(values, "build-room-value"); Label(depth, "Depth (m)"); Label(depth, Session.Layout.room.depth.ToString("0.##"), "build-room-number");
             Tool(room, "Resize room", "resize", () => ShowScreen("Rooms"), "build-resize");
-            var interior = Box(scroll, "build-section"); Label(interior, "Interior", "subheading"); DrawInterior(interior, Session.Layout, true); buildOverlay?.MarkDirtyRepaint();
+            var choices = CurrentInteriorIds(Session.Layout).Select(id => BuildItem(id)?.name).Where(n => n != null); var interior = InspectorFoldout(scroll, "Interior · " + string.Join(" / ", choices), true); DrawInterior(interior, Session.Layout, true); RefreshCommandStates(); buildOverlay?.MarkDirtyRepaint();
+        }
+        void RenameCafe()
+        {
+            if (Session == null) return;
+            var revision = Session.Revision;
+            var candidate = Session.Layout;
+            InputModal("Rename cafe", "Cafe name", candidate.name, name =>
+            {
+                if (string.IsNullOrWhiteSpace(name)) throw new Exception("Choose a cafe name.");
+                candidate.name = name.Trim();
+                var result = Session.Replace(candidate, revision);
+                if (!result.success) throw new Exception(result.message);
+                Apply(result, false);
+                Message("Cafe renamed. Save to keep the new name.");
+            });
+        }
+        void ApplyTransform(CommandResult result)
+        {
+            Apply(result); if (!result.success) { invalidTransformField = true; var label = inspector?.Q<Label>("buildTransformError"); if (label != null) label.text = result.message; }
         }
         Vector2 BuildSelectionCenter(Instance[] selected)
         {
@@ -209,8 +234,9 @@ namespace BlueCafe.App
             readonly StudioApp app;
             public BuildSelectionOverlay(StudioApp app) { this.app = app; pickingMode = PickingMode.Ignore; AddToClassList("build-overlay"); generateVisualContent += Draw; schedule.Execute(() => { app.RefreshBuildTools(); MarkDirtyRepaint(); }).Every(33); }
             Vector2 Project(Vector3 world) { var p = app.View.Camera.WorldToViewportPoint(world); return new Vector2(p.x * contentRect.width, (1 - p.y) * contentRect.height); }
-            static void DashedLine(Painter2D p, Vector2 a, Vector2 b)
+            void DashedLine(Painter2D p, Vector2 a, Vector2 b)
             {
+                if (!CanvasClip.Line(new Rect(2, 2, Mathf.Max(0, contentRect.width - 4), Mathf.Max(0, contentRect.height - 4)), ref a, ref b)) return;
                 var delta = b - a; float length = delta.magnitude; if (length < .1f) return;
                 var direction = delta / length; p.BeginPath();
                 for (float distance = 0; distance < length; distance += 10)
@@ -225,34 +251,34 @@ namespace BlueCafe.App
             void Draw(MeshGenerationContext context)
             {
                 if (app.View == null || app.Session == null || contentRect.width < 1 || contentRect.height < 1) return;
-                var p = context.painter2D;
+                var p = context.painter2D; app.DrawWallGrid(p, Project);
                 if (app.BuildGridVisible)
                 {
                     var room = app.Session.Layout.room; float step = room.grid * Mathf.Max(1, Mathf.Ceil(Mathf.Max(room.width, room.depth) / room.grid / 100));
                     p.strokeColor = new Color(.25f, .36f, .49f, .48f); p.lineWidth = 1;
-                    for (float x = Mathf.Ceil(-room.width / 2 / step) * step; x <= room.width / 2 + .001f; x += step) DashedLine(p, Project(new Vector3(x, .01f, -room.depth / 2)), Project(new Vector3(x, .01f, room.depth / 2)));
-                    for (float z = Mathf.Ceil(-room.depth / 2 / step) * step; z <= room.depth / 2 + .001f; z += step) DashedLine(p, Project(new Vector3(-room.width / 2, .01f, z)), Project(new Vector3(room.width / 2, .01f, z)));
+                    for (float x = Mathf.Ceil((room.centerX - room.width / 2) / step) * step; x <= room.centerX + room.width / 2 + .001f; x += step) DashedLine(p, Project(new Vector3(x, .01f, room.centerZ - room.depth / 2)), Project(new Vector3(x, .01f, room.centerZ + room.depth / 2)));
+                    for (float z = Mathf.Ceil((room.centerZ - room.depth / 2) / step) * step; z <= room.centerZ + room.depth / 2 + .001f; z += step) DashedLine(p, Project(new Vector3(room.centerX - room.width / 2, .01f, z)), Project(new Vector3(room.centerX + room.width / 2, .01f, z)));
                 }
                 var preview = app.View.PlacementPreviewInstance;
-                if (preview != null)
+                if (preview != null && app.BuildItem(preview.furnitureId)?.placement != "wall")
                 {
                     var previewBounds = app.View.PlacementFootprintFor(preview);
                     if (previewBounds.HasValue)
                     {
-                        var footprint = FootprintPoints(previewBounds.Value);
+                        var footprint = CanvasClip.Polygon(new Rect(3, 3, contentRect.width - 6, contentRect.height - 6), FootprintPoints(previewBounds.Value)); if (footprint.Length == 0) return;
                         var color = app.View.PlacementPreviewValid ? new Color(.02f, .49f, 1) : new Color(.91f, .22f, .24f);
                         p.strokeColor = color; p.fillColor = new Color(color.r, color.g, color.b, .12f); p.lineWidth = 2.2f;
-                        p.BeginPath(); p.MoveTo(footprint[0]); for (int i = 1; i < 4; i++) p.LineTo(footprint[i]); p.ClosePath(); p.Fill(); p.Stroke();
+                        p.BeginPath(); p.MoveTo(footprint[0]); for (int i = 1; i < footprint.Length; i++) p.LineTo(footprint[i]); p.ClosePath(); p.Fill(); p.Stroke();
                     }
                 }
                 Bounds? bounds = null;
-                foreach (var id in app.selection) { var next = app.View.FootprintBoundsFor(id); if (next.HasValue) { if (bounds.HasValue) { var combined = bounds.Value; combined.Encapsulate(next.Value); bounds = combined; } else bounds = next; } }
+                foreach (var id in app.selection) { var instance = app.Session.Layout.instances.FirstOrDefault(i => i.instanceId == id); if (instance != null && app.BuildItem(instance.furnitureId)?.placement == "wall") continue; var next = app.View.FootprintBoundsFor(id); if (next.HasValue) { if (bounds.HasValue) { var combined = bounds.Value; combined.Encapsulate(next.Value); bounds = combined; } else bounds = next; } }
                 if (!bounds.HasValue) return;
-                var points = FootprintPoints(bounds.Value);
-                p.strokeColor = new Color(.02f, .49f, 1); p.lineWidth = 2.2f; p.BeginPath(); p.MoveTo(points[0]); for (int i = 1; i < 4; i++) p.LineTo(points[i]); p.ClosePath(); p.Stroke();
+                var originalPoints = FootprintPoints(bounds.Value); var points = CanvasClip.Polygon(new Rect(3, 3, contentRect.width - 6, contentRect.height - 6), originalPoints); if (points.Length == 0) return;
+                p.strokeColor = new Color(.02f, .49f, 1); p.lineWidth = 2.2f; p.BeginPath(); p.MoveTo(points[0]); for (int i = 1; i < points.Length; i++) p.LineTo(points[i]); p.ClosePath(); p.Stroke();
                 p.fillColor = new Color(.02f, .49f, 1); p.strokeColor = Color.white; p.lineWidth = 1.5f;
                 // Corner dots indicate the selected footprint; furniture moves as a rigid group.
-                foreach (var point in points) { p.BeginPath(); p.Arc(point, 4.5f, Angle.Degrees(0), Angle.Degrees(360)); p.Fill(); p.Stroke(); }
+                foreach (var point in originalPoints) { if (!new Rect(7, 7, contentRect.width - 14, contentRect.height - 14).Contains(point)) continue; p.BeginPath(); p.Arc(point, 4.5f, Angle.Degrees(0), Angle.Degrees(360)); p.Fill(); p.Stroke(); }
             }
         }
     }

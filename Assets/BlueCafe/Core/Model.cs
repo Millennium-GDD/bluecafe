@@ -4,7 +4,8 @@ using System.Linq;
 
 namespace BlueCafe.Core
 {
-    // Field names are the portable version-1 catalog/layout JSON contract.
+    // Catalog and legacy furniture fields retain their portable v1 names.
+    // Layout v2 adds explicit enclosure, named areas and wall attachment metadata.
     [Serializable] public class Catalog
     {
         public int version = 1;
@@ -49,12 +50,25 @@ namespace BlueCafe.Core
         public float x, y, z;
         public Position(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
     }
-    [Serializable] public class Room { public float width = 18, depth = 18, wallHeight = 4.8f, grid = .6f; }
+    [Serializable] public class Room { public float width = 18, depth = 18, wallHeight = 4.8f, grid = .6f; public float centerX, centerZ; }
+    [Serializable] public class Area
+    {
+        public string id, name, color, flooringId, wallpaperId;
+        public Position[] vertices;
+    }
+    [Serializable] public class WallOpening
+    {
+        public string id, wallId;
+        public float along, width, bottom, height;
+    }
     [Serializable] public class Instance
     {
         public string instanceId, furnitureId;
         public Position position;
         public int quarterTurns;
+        public string wallId;
+        public float wallAlong;
+        public bool legacyWallFootprint;
     }
     [Serializable] public class Layout
     {
@@ -62,21 +76,26 @@ namespace BlueCafe.Core
         public string name = "Untitled cafe";
         public Room room = new Room();
         public List<Instance> instances = new List<Instance>();
+        public List<Area> areas = new List<Area>();
+        public List<WallOpening> openings = new List<WallOpening>();
     }
 
     public static class Copies
     {
         public static Layout Copy(Layout value) => value == null ? null : new Layout {
             version = value.version, name = value.name, room = Copy(value.room),
-            instances = value.instances?.Select(Copy).ToList()
+            instances = value.instances?.Select(Copy).ToList(),
+            areas = value.areas?.Select(Copy).ToList(), openings = value.openings?.Select(Copy).ToList()
         };
         public static Room Copy(Room value) => value == null ? null : new Room {
-            width = value.width, depth = value.depth, wallHeight = value.wallHeight, grid = value.grid
+            width = value.width, depth = value.depth, wallHeight = value.wallHeight, grid = value.grid, centerX = value.centerX, centerZ = value.centerZ
         };
         public static Instance Copy(Instance value) => value == null ? null : new Instance {
             instanceId = value.instanceId, furnitureId = value.furnitureId,
-            position = value.position, quarterTurns = value.quarterTurns
+            position = value.position, quarterTurns = value.quarterTurns, wallId = value.wallId, wallAlong = value.wallAlong, legacyWallFootprint = value.legacyWallFootprint
         };
+        public static Area Copy(Area value) => value == null ? null : new Area { id = value.id, name = value.name, color = value.color, flooringId = value.flooringId, wallpaperId = value.wallpaperId, vertices = value.vertices == null ? null : (Position[])value.vertices.Clone() };
+        public static WallOpening Copy(WallOpening value) => value == null ? null : new WallOpening { id = value.id, wallId = value.wallId, along = value.along, width = value.width, bottom = value.bottom, height = value.height };
         static float[] Copy(float[] value) => value == null ? null : (float[])value.Clone();
         public static Catalog Copy(Catalog value) => value == null ? null : new Catalog {
             version = value.version, gridUnit = value.gridUnit, region = value.region,
@@ -110,12 +129,12 @@ namespace BlueCafe.Core
             if (a == null || b == null) return a == b;
             if (a.version != b.version || a.name != b.name || a.room.width != b.room.width ||
                 a.room.depth != b.room.depth || a.room.wallHeight != b.room.wallHeight || a.room.grid != b.room.grid ||
-                a.instances.Count != b.instances.Count) return false;
+                a.instances.Count != b.instances.Count || !Geometry.Equal(a, b)) return false;
             for (int n = 0; n < a.instances.Count; n++)
             {
                 var x = a.instances[n]; var y = b.instances[n];
                 if (x.instanceId != y.instanceId || x.furnitureId != y.furnitureId || x.quarterTurns != y.quarterTurns ||
-                    x.position.x != y.position.x || x.position.y != y.position.y || x.position.z != y.position.z) return false;
+                    x.legacyWallFootprint != y.legacyWallFootprint || (x.wallId ?? "") != (y.wallId ?? "") || x.wallAlong != y.wallAlong || x.position.x != y.position.x || x.position.y != y.position.y || x.position.z != y.position.z) return false;
             }
             return true;
         }

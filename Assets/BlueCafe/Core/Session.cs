@@ -15,7 +15,7 @@ namespace BlueCafe.Core
 
     // The host dispatches these synchronous operations on its main-thread command queue.
     // No caller can mutate committed state through the detached public snapshots.
-    public sealed class Session
+    public sealed partial class Session
     {
         Catalog catalog;
         Layout layout, saved;
@@ -96,7 +96,7 @@ namespace BlueCafe.Core
                 if (item.placement == "wall")
                 {
                     p.y = Placement.WallElevation(catalog, item, elevation < 0 ? Placement.Snap(candidate.room.wallHeight / 2, candidate.room.grid) : elevation, candidate.room);
-                    quarterTurns = Math.Abs(p.x + candidate.room.width / 2) < .001f ? 0 : 1;
+                    quarterTurns = Math.Abs(p.x - candidate.room.centerX + candidate.room.width / 2) < .001f ? 0 : 1;
                 }
                 if (Placement.IsRoomStyle(item))
                 {
@@ -104,7 +104,9 @@ namespace BlueCafe.Core
                     candidate.instances.RemoveAll(i => Placement.Find(catalog, i.furnitureId).placement == item.placement);
                 }
                 var id = Guid.NewGuid().ToString("N");
-                candidate.instances.Add(new Instance { instanceId = id, furnitureId = furnitureId, position = p, quarterTurns = quarterTurns });
+                var created = new Instance { instanceId = id, furnitureId = furnitureId, position = p, quarterTurns = quarterTurns };
+                if(candidate.version==2 && item.placement=="wall") {created.wallId=quarterTurns==0?"left":"back";created.wallAlong=Geometry.Along(candidate.room,created.wallId,p);}
+                candidate.instances.Add(created);
                 return new[] { id };
             });
 
@@ -124,6 +126,7 @@ namespace BlueCafe.Core
             {
                 var p = instance.position;
                 instance.position = new Position(p.x + sx, p.y, p.z + sz);
+                if(!string.IsNullOrEmpty(instance.wallId)) instance.wallAlong = Geometry.Along(candidate.room,instance.wallId,instance.position);
             }
         }
         void ProtectAttachments(Instance[] before, Instance[] after, Room room)
@@ -135,9 +138,15 @@ namespace BlueCafe.Core
                     Placement.Require(before[n].position.x == after[n].position.x && before[n].position.z == after[n].position.z && after[n].quarterTurns == 0,
                         "ROOM_STYLE_FIXED", "Room styles have no movable furniture transform.");
                 if (item.placement != "wall") continue;
+                if(!string.IsNullOrEmpty(before[n].wallId)) {
+                    var expected=Geometry.WallPosition(room,before[n].wallId,after[n].wallAlong,after[n].position.y);
+                    if(after[n].wallId!=before[n].wallId || after[n].quarterTurns!=before[n].quarterTurns || Math.Abs(expected.x-after[n].position.x)>=.001f || Math.Abs(expected.z-after[n].position.z)>=.001f)
+                        throw new ValidationException("ATTACHMENT_CONFLICT","The operation detaches a wall decoration.",before[n].instanceId);
+                    continue;
+                }
                 var left = before[n].quarterTurns == 0;
                 var p = after[n].position;
-                if ((left ? Math.Abs(p.x + room.width / 2) : Math.Abs(p.z - room.depth / 2)) >= .001f ||
+                if ((left ? Math.Abs(p.x - room.centerX + room.width / 2) : Math.Abs(p.z - room.centerZ - room.depth / 2)) >= .001f ||
                     after[n].quarterTurns != before[n].quarterTurns)
                     throw new ValidationException("ATTACHMENT_CONFLICT", "The operation would change an item's attached wall: " + before[n].instanceId, before[n].instanceId);
             }

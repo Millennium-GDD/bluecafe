@@ -25,7 +25,14 @@ namespace BlueCafe.Unity
             public Instance Instance;
         }
         const int ViewLayer = 30;
-        const int MaxModulesPerStyle = 4096;
+        // Four 1000-unit enclosure walls using the smallest acquired (.6) span.
+        const int MaxModulesPerStyle = 8192;
+        static readonly HashSet<RuntimeView> liveViews = new HashSet<RuntimeView>();
+        readonly Dictionary<Transform, string> wallModules = new Dictionary<Transform, string>();
+        readonly Dictionary<MeshFilter, Mesh> fittedMeshes = new Dictionary<MeshFilter, Mesh>();
+        Layout geometryLayout;
+        readonly long renderBudget;
+        long fittedBytes;
         readonly Pack pack;
         readonly Dictionary<string, Item> items;
         readonly RuntimeResources resources;
@@ -39,12 +46,13 @@ namespace BlueCafe.Unity
         readonly List<RenderUnavailable> unavailable = new List<RenderUnavailable>();
         RenderTexture texture;
         Room room;
+        float backgroundDepth = 200;
         bool framed, disposed;
         public Camera Camera { get; }
         public long Revision { get; private set; } = -1;
         public IReadOnlyList<RenderUnavailable> Unavailable => unavailable;
-        public long ResourceBytes => resources.Bytes;
-        public int MeshCount => resources.MeshCount;
+        public long ResourceBytes => resources.Bytes + fittedBytes;
+        public int MeshCount => resources.MeshCount + fittedMeshes.Count + floorMeshes.Values.Sum(meshes=>meshes.Count);
         public int TextureCount => resources.TextureCount;
         public int MaterialCount => resources.MaterialCount;
         public int ObjectCount => objects.Count;
@@ -54,6 +62,7 @@ namespace BlueCafe.Unity
         {
             this.pack = pack ?? throw new ArgumentNullException(nameof(pack));
             if (resourceBudgetBytes <= 0) throw new ArgumentOutOfRangeException(nameof(resourceBudgetBytes));
+            renderBudget=resourceBudgetBytes;
             if (projectionScene.HasValue && (!projectionScene.Value.IsValid() || !projectionScene.Value.isLoaded))
                 throw new ArgumentException("The supplied projection scene must be valid and loaded.", nameof(projectionScene));
             items = pack.Catalog.items.ToDictionary(i => i.id, StringComparer.Ordinal);
@@ -70,6 +79,7 @@ namespace BlueCafe.Unity
             Camera.orthographic = true; Camera.nearClipPlane = .01f; Camera.farClipPlane = 1000;
             Camera.allowHDR = false; Camera.allowMSAA = true; Camera.cullingMask = 1 << ViewLayer;
             Camera.scene = scene;
+            liveViews.Add(this);
         }
         void CheckThread()
         {
@@ -88,9 +98,13 @@ namespace BlueCafe.Unity
             if (layout?.room == null || layout.instances == null) throw new ArgumentException("A committed layout with room and instances is required.", nameof(layout));
             if (revision < Revision) throw new InvalidOperationException("STALE_REVISION: projection cannot move backward.");
             ClearPlacementPreview();
-            bool roomChanged = room == null || room.width != layout.room.width || room.depth != layout.room.depth || room.wallHeight != layout.room.wallHeight;
-            room = new Room { width = layout.room.width, depth = layout.room.depth, wallHeight = layout.room.wallHeight, grid = layout.room.grid };
-            var byId = layout.instances.ToDictionary(i => i.instanceId, StringComparer.Ordinal);
+            bool roomChanged = geometryLayout == null || geometryLayout.version != layout.version || !Geometry.Equal(geometryLayout,layout) || room.width != layout.room.width || room.depth != layout.room.depth || room.wallHeight != layout.room.wallHeight;
+            geometryLayout = Copies.Copy(layout);
+            room = Copies.Copy(layout.room);
+            bool hasWallpaper=layout.instances.Any(i=>items.TryGetValue(i.furnitureId,out var catalogItem)&&catalogItem.placement=="wallpaper");
+            var renderInstances = layout.instances.Concat((layout.areas ?? new List<Area>()).Where(a=>!string.IsNullOrEmpty(a.flooringId)).Select(a=>new Instance{instanceId="area-floor:"+a.id,furnitureId=a.flooringId}))
+                .Concat((layout.areas??new List<Area>()).Where(a=>!hasWallpaper&&!string.IsNullOrEmpty(a.wallpaperId)).Select(a=>new Instance{instanceId="area-wall:"+a.id,furnitureId=a.wallpaperId})).ToArray();
+            var byId = renderInstances.ToDictionary(i => i.instanceId, StringComparer.Ordinal);
             foreach (var pair in objects.ToArray())
             {
                 byId.TryGetValue(pair.Key, out var source);
@@ -99,7 +113,7 @@ namespace BlueCafe.Unity
             }
             resources.Trim(root);
             unavailable.Clear();
-            foreach (var instance in layout.instances)
+            foreach (var instance in renderInstances)
             {
                 if (!items.TryGetValue(instance.furnitureId, out var item))
                 {
@@ -114,8 +128,9 @@ namespace BlueCafe.Unity
                     {
                         // An item is atomic: one missing original part makes the whole instance unavailable.
                         go = NewObject(item.name ?? item.id, root.transform);
-                        if (item.placement == "flooring" || item.placement == "wallpaper") AssembleRoomStyle(item, go.transform);
+                        if (item.placement == "flooring" || item.placement == "wallpaper") AssembleRoomStyle(item, go.transform, instance.instanceId.StartsWith("area-floor:",StringComparison.Ordinal) || instance.instanceId.StartsWith("area-wall:",StringComparison.Ordinal) ? layout.areas.First(a=>"area-floor:"+a.id==instance.instanceId || "area-wall:"+a.id==instance.instanceId) : null);
                         else Assemble(item, go.transform);
+                        ReserveSurface(0);
                         ApplyNativePivot(item, go);
                         projection = new Projection { FurnitureId = item.id, Object = go };
                         go.name = (item.name ?? item.id) + " [" + instance.instanceId + "]";
@@ -124,7 +139,7 @@ namespace BlueCafe.Unity
                     }
                     catch (Exception e) when (e is IOException || e is InvalidDataException || e is UnauthorizedAccessException || e is ArgumentException || e is InvalidOperationException || e is PackException || e is FormatException || e is UnityException)
                     {
-                        if (go) RuntimeResources.Release(go);
+                        if (go) { ReleaseFitted(go);RuntimeResources.Release(go); }
                         resources.Trim(root); framingHelpers.RemoveWhere(r => !r || !r.transform.IsChildOf(root.transform));
                         Missing(instance, e.Message); continue;
                     }
@@ -141,8 +156,8 @@ namespace BlueCafe.Unity
         void Remove(string id)
         {
             var go = objects[id].Object;
-            foreach (var renderer in go.GetComponentsInChildren<Renderer>()) framingHelpers.Remove(renderer);
-            backgrounds.Remove(go); RuntimeResources.Release(go); objects.Remove(id);
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) framingHelpers.Remove(renderer);
+            ReleaseFitted(go); backgrounds.Remove(go); RuntimeResources.Release(go); objects.Remove(id);
         }
         void Assemble(Item item, Transform parent)
         {
@@ -219,9 +234,9 @@ namespace BlueCafe.Unity
             var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             void Include(Vector3 point) { var p = inverse * point; min = Vector3.Min(min, p); max = Vector3.Max(max, p); }
-            var renderers = root.GetComponentsInChildren<Renderer>().Where(r => !IsPlacementPreviewRenderer(r) && !framingHelpers.Contains(r) && !backgrounds.Any(b => r.transform.IsChildOf(b.transform))).ToArray();
+            var renderers = root.GetComponentsInChildren<Renderer>(true).Where(r => !IsPlacementPreviewRenderer(r) && !framingHelpers.Contains(r) && !backgrounds.Any(b => r.transform.IsChildOf(b.transform))).ToArray();
             if (renderers.Length == 0)
-                for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++) Include(new Vector3((x - .5f) * room.width, 0, (z - .5f) * room.depth));
+                for (int x = 0; x < 2; x++) for (int z = 0; z < 2; z++) Include(new Vector3(room.centerX + (x - .5f) * room.width, 0, room.centerZ + (z - .5f) * room.depth));
             foreach (var renderer in renderers)
             {
                 var b = renderer.bounds;
@@ -229,6 +244,7 @@ namespace BlueCafe.Unity
             }
             var center = (min + max) / 2;
             Camera.transform.SetPositionAndRotation(rotation * new Vector3(center.x, center.y, min.z - 50), rotation);
+            SetCameraDepth(max.z-min.z+50);
             Camera.orthographicSize = Mathf.Max(.1f, Mathf.Max((max.y - min.y) / 2, (max.x - min.x) / 2 / Mathf.Max(.1f, Camera.aspect)) * 1.09f);
             UpdateBackgrounds();
         }
@@ -236,13 +252,36 @@ namespace BlueCafe.Unity
         {
             foreach (var background in backgrounds)
             {
-                background.transform.SetPositionAndRotation(Camera.transform.position + Camera.transform.forward * 200, Camera.transform.rotation);
+                background.transform.SetPositionAndRotation(Camera.transform.position + Camera.transform.forward * backgroundDepth, Camera.transform.rotation);
                 float span = Camera.orthographicSize * 2;
                 background.transform.localScale = new Vector3(span * Camera.aspect, span, 1);
             }
         }
+        void SetCameraDepth(float geometryDepth)
+        {
+            backgroundDepth=Mathf.Max(200,geometryDepth+50);
+            Camera.farClipPlane=Mathf.Max(1000,backgroundDepth+50);
+        }
+        void UpdateWallCutaway()
+        {
+            foreach(var pair in wallModules) if(pair.Key) {
+                int side=Geometry.WallTurns(pair.Value);var inward=side==0?Vector3.right:side==1?Vector3.back:side==2?Vector3.left:Vector3.forward;
+                pair.Key.gameObject.SetActive(Vector3.Dot(inward,Camera.transform.forward)<-.0001f);
+            }
+        }
+        /// <summary>Inspect any supported wall from inside the cafe; FrameRoom restores the standard oblique view.</summary>
+        public void FocusWall(string wallId)
+        {
+            CheckThread();if(room==null)return;int side=Geometry.WallTurns(wallId);
+            var inward=side==0?Vector3.right:side==1?Vector3.back:side==2?Vector3.left:Vector3.forward;
+            var tangent=Vector3.Cross(Vector3.up,inward);float span=Math.Max(room.width,room.depth);
+            var target=new Vector3(room.centerX,room.wallHeight*.45f,room.centerZ);var from=target+inward*span+tangent*span*.3f+Vector3.up*span*.55f;
+            Camera.transform.SetPositionAndRotation(from,Quaternion.LookRotation(target-from,Vector3.up));Camera.orthographicSize=Math.Max(room.wallHeight,Geometry.WallLength(room,wallId))*.62f;framed=true;
+            SetCameraDepth(span*3+room.wallHeight);
+            UpdateWallCutaway();UpdateBackgrounds();
+        }
         public void Pan(Vector2 delta) { CheckThread(); Camera.transform.position += (-Camera.transform.right * delta.x + Camera.transform.up * delta.y) * Camera.orthographicSize / 350; }
-        public void Zoom(float delta) { CheckThread(); Camera.orthographicSize = Mathf.Clamp(Camera.orthographicSize * Mathf.Exp(delta * .04f), 1, 300); }
+        public void Zoom(float delta) { CheckThread(); Camera.orthographicSize = Mathf.Clamp(Camera.orthographicSize * Mathf.Exp(delta * .04f), 1, Mathf.Max(300,room==null?0:room.width+room.depth)); }
         public RenderTexture Render(int width, int height)
         {
             CheckThread(); width = Mathf.Clamp(width, 32, 4096); height = Mathf.Clamp(height, 32, 4096);
@@ -254,7 +293,13 @@ namespace BlueCafe.Unity
                 if (!texture.Create()) throw new InvalidOperationException("RENDER_TARGET_FAILED: could not allocate viewport.");
             }
             Camera.targetTexture = texture; Camera.aspect = (float)width / height;
-            if (firstRender) FrameRoom(); UpdateBackgrounds(); Camera.Render(); return texture;
+            if (firstRender) FrameRoom(); UpdateBackgrounds(); UpdateWallCutaway();
+            // Camera.scene isolates Editor previews but Player cameras otherwise see every
+            // loaded scene sharing this layer. Scope visibility to this render call.
+            var hidden=liveViews.Where(v=>v!=this && !v.disposed && v.root && v.root.activeSelf).ToArray();
+            try {foreach(var view in hidden)view.root.SetActive(false);Camera.Render();}
+            finally {foreach(var view in hidden)if(view.root)view.root.SetActive(true);}
+            return texture;
         }
         /// <summary>Point is local to the top-left of the viewport, matching UI Toolkit.</summary>
         public Ray ScreenRay(Vector2 local, Rect rect)
@@ -283,6 +328,7 @@ namespace BlueCafe.Unity
             if (width < 32 || height < 32 || width > 4096 || height > 4096) throw new ArgumentOutOfRangeException(nameof(width), "Capture dimensions must be 32–4096.");
             var oldPosition = Camera.transform.position; var oldRotation = Camera.transform.rotation;
             var oldSize = Camera.orthographicSize; var oldAspect = Camera.aspect;
+            var oldFar = Camera.farClipPlane; var oldBackgroundDepth = backgroundDepth;
             var previous = RenderTexture.active; Texture2D image = null;
             try
             {
@@ -295,14 +341,14 @@ namespace BlueCafe.Unity
             finally
             {
                 RenderTexture.active = previous; RuntimeResources.Release(image);
-                Camera.transform.SetPositionAndRotation(oldPosition, oldRotation); Camera.orthographicSize = oldSize; Camera.aspect = oldAspect; UpdateBackgrounds();
+                Camera.transform.SetPositionAndRotation(oldPosition, oldRotation); Camera.orthographicSize = oldSize; Camera.aspect = oldAspect; Camera.farClipPlane=oldFar; backgroundDepth=oldBackgroundDepth; UpdateBackgrounds();
             }
         }
         public void Dispose()
         {
             if (disposed) return; CheckThread(); ClearPlacementPreview(); disposed = true;
             if (texture) { Camera.targetTexture = null; texture.Release(); RuntimeResources.Release(texture); }
-            RuntimeResources.Release(root); resources.Dispose();
+            ReleaseFitted(root); liveViews.Remove(this); RuntimeResources.Release(root); resources.Dispose();
             objects.Clear(); backgrounds.Clear(); framingHelpers.Clear(); unavailable.Clear();
             if (ownsScene && scene.IsValid() && scene.isLoaded) SceneManager.UnloadSceneAsync(scene);
         }

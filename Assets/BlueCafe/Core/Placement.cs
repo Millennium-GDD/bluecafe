@@ -43,7 +43,7 @@ namespace BlueCafe.Core
         }
         public static void ValidateRoom(Room room)
         {
-            Require(room != null && Finite(room.width) && Finite(room.depth) && Finite(room.wallHeight) && Finite(room.grid), "INVALID_ROOM", "Room dimensions must be finite.");
+            Require(room != null && Finite(room.width) && Finite(room.depth) && Finite(room.wallHeight) && Finite(room.grid) && Finite(room.centerX) && Finite(room.centerZ), "INVALID_ROOM", "Room dimensions must be finite.");
             Require(room.width > 0 && room.depth > 0 && room.wallHeight > 0 && room.grid > 0 && room.width <= 1000 && room.depth <= 1000 && room.grid <= Math.Min(room.width, room.depth),
                 "INVALID_ROOM", "Use positive dimensions up to 1000 and a grid smaller than the room.");
         }
@@ -59,18 +59,18 @@ namespace BlueCafe.Core
             position = new Position(Snap(position.x, step), 0, Snap(position.z, step));
             if (item.placement == "wall")
             {
-                if (Math.Abs(position.x + room.width / 2) < Math.Abs(position.z - room.depth / 2)) position.x = -room.width / 2;
-                else position.z = room.depth / 2;
+                if (Math.Abs(position.x - room.centerX + room.width / 2) < Math.Abs(position.z - room.centerZ - room.depth / 2)) position.x = room.centerX - room.width / 2;
+                else position.z = room.centerZ + room.depth / 2;
             }
             var w = Math.Max(.01f, item.width * catalog.gridUnit); var d = Math.Max(.01f, item.depth * catalog.gridUnit);
             if (turns % 2 == 1) { var t = w; w = d; d = t; }
             if (item.placement == "wall")
             {
-                var left = Math.Abs(position.x + room.width / 2) < .001f;
-                var along = left ? position.z : position.x; var length = left ? room.depth : room.width;
+                var left = Math.Abs(position.x - room.centerX + room.width / 2) < .001f;
+                var along = left ? position.z - room.centerZ : position.x - room.centerX; var length = left ? room.depth : room.width;
                 Require(Math.Abs(along) + item.width * catalog.gridUnit / 2 <= length / 2 + .001f, "OUTSIDE_ROOM", "Wall item must fit along the wall.");
             }
-            else Require(Math.Abs(position.x) + w / 2 <= room.width / 2 + .001f && Math.Abs(position.z) + d / 2 <= room.depth / 2 + .001f,
+            else Require(Math.Abs(position.x - room.centerX) + w / 2 <= room.width / 2 + .001f && Math.Abs(position.z - room.centerZ) + d / 2 <= room.depth / 2 + .001f,
                 "OUTSIDE_ROOM", "The item footprint must fit inside the room.");
             return position;
         }
@@ -82,10 +82,28 @@ namespace BlueCafe.Core
             Require(elevation >= half - .001f && elevation + half <= room.wallHeight + .001f, "INVALID_ELEVATION", "Wall item must fit vertically within the wall.");
             return elevation;
         }
+        public static float AttachmentWidth(Catalog c,Item i) => i.bounds?.min?.Length>=3 && i.bounds.max?.Length>=3 ? Math.Max(i.width*c.gridUnit,i.bounds.max[2]-i.bounds.min[2]) : i.width*c.gridUnit;
+        public static float AttachmentHeight(Catalog c,Item i) => i.bounds?.min?.Length>=3 && i.bounds.max?.Length>=3 ? Math.Max(i.height*c.gridUnit,i.bounds.max[1]-i.bounds.min[1]) : i.height*c.gridUnit;
+        public static void ValidateAttachment(Catalog c,Item item,Instance instance,Layout l)
+        {
+            var along=instance.wallAlong;var y=instance.position.y;var half=(instance.legacyWallFootprint?item.width*c.gridUnit:AttachmentWidth(c,item))/2;var h=(instance.legacyWallFootprint?item.height*c.gridUnit:AttachmentHeight(c,item))/2;
+            Require(Finite(along)&&Finite(y)&&Finite(instance.position.x)&&Finite(instance.position.z),"INVALID_ATTACHMENT","Attachment coordinates must be finite.");
+            Require(along-half>=-.001f&&along+half<=Geometry.WallLength(l.room,instance.wallId)+.001f,"OUTSIDE_WALL","Decoration footprint crosses a wall edge.");
+            Require(y-h>=-.001f&&y+h<=l.room.wallHeight+.001f,"INVALID_ELEVATION","Decoration footprint crosses the floor or wall top.");
+            var p=Geometry.WallPosition(l.room,instance.wallId,along,y);
+            Require(Math.Abs(p.x-instance.position.x)<.001f&&Math.Abs(p.z-instance.position.z)<.001f&&instance.quarterTurns==Geometry.WallTurns(instance.wallId),"ATTACHMENT_CONFLICT","Decoration must retain its attached wall position and orientation.");
+            Require((instance.legacyWallFootprint || Math.Abs(Snap(along,l.room.grid)-along)<.001f)&&Math.Abs(Snap(y,l.room.grid)-y)<.001f,"OFF_GRID","Wall position and elevation must obey the wall grid.");
+            foreach(var o in l.openings) if(o.wallId==instance.wallId && along+half>o.along-o.width/2+.001f && along-half<o.along+o.width/2-.001f && y+h>o.bottom+.001f && y-h<o.bottom+o.height-.001f)
+                throw new ValidationException("OPENING_CONFLICT","Decoration overlaps wall opening "+o.id,instance.instanceId);
+        }
         public static void ValidateLayout(Catalog catalog, Layout layout, bool allowUnavailable = false)
         {
-            Require(layout != null && layout.version == 1 && layout.instances != null, "INVALID_LAYOUT", "Expected version 1 layout and instances array.");
-            ValidateRoom(layout.room);
+            Require(layout != null && (layout.version == 1 || layout.version == 2) && layout.instances != null, "INVALID_LAYOUT", "Expected version 1 or 2 layout and instances array.");
+            Geometry.Validate(layout);
+            foreach(var area in layout.areas ?? new List<Area>()) {
+                if(!string.IsNullOrEmpty(area.flooringId)) Require(Find(catalog,area.flooringId).placement=="flooring","INVALID_ROOM_STYLE","Area flooring id must reference flooring.");
+                if(!string.IsNullOrEmpty(area.wallpaperId)) Require(Find(catalog,area.wallpaperId).placement=="wallpaper","INVALID_ROOM_STYLE","Area wallpaper id must reference wallpaper.");
+            }
             var ids = new HashSet<string>(); var styles = new HashSet<string>();
             foreach (var instance in layout.instances)
             {
@@ -95,12 +113,18 @@ namespace BlueCafe.Core
                     var item = Find(catalog, instance.furnitureId);
                     Require(allowUnavailable || item.available, "ASSET_UNAVAILABLE", instance.furnitureId);
                     if (IsRoomStyle(item)) Require(styles.Add(item.placement) && instance.quarterTurns == 0, "INVALID_ROOM_STYLE", "Each room style must occur once with zero rotation.");
+                    Require(layout.version != 2 || item.placement != "wall" || !string.IsNullOrEmpty(instance.wallId),"INVALID_ATTACHMENT","Version 2 wall decorations require wall identity and along-wall coordinates.");
+                    if(item.placement == "wall" && !string.IsNullOrEmpty(instance.wallId)) {
+                        Require(layout.version==2,"INVALID_LAYOUT","Explicit attachments require version 2.");
+                        ValidateAttachment(catalog,item,instance,layout); continue;
+                    }
+                    Require(string.IsNullOrEmpty(instance.wallId) && instance.wallAlong==0 && !instance.legacyWallFootprint,"INVALID_ATTACHMENT","Only wall furniture has attachment coordinates.");
                     var p = Constrain(catalog, item, instance.position, instance.quarterTurns, layout.room);
                     Require(instance.position.y >= 0 && instance.position.y <= layout.room.wallHeight, "INVALID_ELEVATION", instance.instanceId);
                     if (item.placement == "wall")
                     {
                         p.y = WallElevation(catalog, item, instance.position.y, layout.room);
-                        var side = Math.Abs(p.x + layout.room.width / 2) < .001f ? 0 : 1;
+                        var side = Math.Abs(p.x - layout.room.centerX + layout.room.width / 2) < .001f ? 0 : 1;
                         Require(instance.quarterTurns == side, "INVALID_ROTATION", "Wall objects must face inward from their attached wall.");
                     }
                     var dx = p.x - instance.position.x; var dy = p.y - instance.position.y; var dz = p.z - instance.position.z;

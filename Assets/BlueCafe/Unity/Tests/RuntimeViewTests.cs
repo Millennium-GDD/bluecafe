@@ -53,6 +53,166 @@ namespace BlueCafe.Unity.Tests
             return new RuntimeView(pack, budget, scene);
         }
         Layout Layout(params string[] ids) => new Layout { instances = ids.Select(id => new Instance { instanceId = id, furnitureId = "fixture", position = new Position(0, 0, 0) }).ToList() };
+        void PrepareSmallFloor()
+        {
+            // Match the original default floor's .6-unit module span. A 40-unit
+            // cafe needs 67 * 67 modules, crossing the former 4096-module limit.
+            File.WriteAllText(Path.Combine(directory,MeshFile),"{\"vertices\":[-0.3,0,-0.3,0.3,0,-0.3,0.3,0,0.3,-0.3,0,0.3],\"normals\":[0,1,0,0,1,0,0,1,0,0,1,0],\"uv\":[0,0,1,0,1,1,0,1],\"submeshes\":[{\"triangles\":[0,2,1,0,3,2]}]}");
+            var catalog=pack.Catalog;var item=catalog.items[0];item.placement="flooring";
+            item.bounds=new BoundsData{min=new[]{-.3f,0f,-.3f},max=new[]{.3f,0f,.3f}};
+            item.parts[0].position=new[]{0f,0f,0f};
+            File.WriteAllText(Path.Combine(directory,"catalog.json"),JsonUtility.ToJson(catalog));pack=Pack.Load(directory);
+        }
+        [TestCase(1,false)] [TestCase(2,false)] [TestCase(2,true)]
+        public void FortyUnitFloorRendersOriginalCoverageBeyondFormerModuleLimit(int version,bool areaFloor)
+        {
+            PrepareSmallFloor();var source=File.ReadAllBytes(Path.Combine(directory,MeshFile));
+            var layout=Layout("large-floor");layout.version=version;layout.room.width=40;layout.room.depth=40;
+            if(areaFloor){layout.instances.Clear();layout.areas.Add(new Area{id="large",name="Large room",flooringId="fixture",vertices=Geometry.Extent(layout.room)});}
+            view=CreateView();view.Sync(layout,1);
+            Assert.That(view.Unavailable,Is.Empty,"A valid 40×40 cafe must retain its original flooring.");
+            Assert.That(view.ObjectCount,Is.EqualTo(1));
+            var go=view.Camera.transform.parent.Cast<Transform>().Single(t=>t.name.StartsWith("Runtime test fixture [",StringComparison.Ordinal)).gameObject;
+            var filters=go.GetComponentsInChildren<MeshFilter>();double surfaceArea=0;
+            foreach(var filter in filters) {
+                var vertices=filter.sharedMesh.vertices;var triangles=filter.sharedMesh.triangles;
+                foreach(var vertex in vertices) {
+                    var world=filter.transform.TransformPoint(vertex);
+                    if(version==2){Assert.That(world.x,Is.InRange(-20.0001f,20.0001f));Assert.That(world.z,Is.InRange(-20.0001f,20.0001f));}
+                }
+                for(int i=0;i<triangles.Length;i+=3){var a=filter.transform.TransformPoint(vertices[triangles[i]]);var b=filter.transform.TransformPoint(vertices[triangles[i+1]]);var c=filter.transform.TransformPoint(vertices[triangles[i+2]]);surfaceArea+=Vector3.Cross(b-a,c-a).magnitude/2;}
+            }
+            Assert.That(surfaceArea,Is.EqualTo(version==1?40.2*40.2:1600).Within(.1),"Every original tile must contribute exactly once, including partial edge tiles.");
+            Assert.That(filters.Length,Is.LessThan(4096),"Floor repetition must not create one renderer per original module.");
+            Assert.That(filters.Select(f=>f.sharedMesh).Distinct().Count(),Is.LessThan(100),"Intact repeated geometry must share mesh resources.");
+            CollectionAssert.AreEqual(source,File.ReadAllBytes(Path.Combine(directory,MeshFile)));
+            layout.instances.Clear();layout.areas.Clear();view.Sync(layout,2);
+            Assert.That(view.ResourceBytes,Is.Zero,"Removing flooring must release shared and clipped mesh resources.");
+        }
+        [Test] public void LargeConcaveAreaReplacesDefaultFloorWithoutGapsOrOverlappingCoverage()
+        {
+            PrepareSmallFloor();var layout=Layout("default-floor");layout.version=2;layout.room.width=40;layout.room.depth=40;
+            var polygon=new[]{new Position(-20,0,-20),new Position(20,0,-20),new Position(20,0,-5),new Position(-5,0,-5),new Position(-5,0,20),new Position(-20,0,20)};
+            layout.areas.Add(new Area{id="large-L",name="Large L",flooringId="fixture",vertices=polygon});
+            view=CreateView();view.Sync(layout,1);Assert.That(view.Unavailable,Is.Empty);
+            foreach(var id in new[]{"default-floor","area-floor:large-L"}) {
+                var go=view.Camera.transform.parent.Cast<Transform>().Single(t=>t.name=="Runtime test fixture ["+id+"]").gameObject;
+                double area=0;
+                foreach(var filter in go.GetComponentsInChildren<MeshFilter>()) {
+                    var vertices=filter.sharedMesh.vertices;var triangles=filter.sharedMesh.triangles;
+                    for(int i=0;i<triangles.Length;i+=3) {
+                        var a=filter.transform.TransformPoint(vertices[triangles[i]]);var b=filter.transform.TransformPoint(vertices[triangles[i+1]]);var c=filter.transform.TransformPoint(vertices[triangles[i+2]]);
+                        var triangleArea=Vector3.Cross(b-a,c-a).magnitude/2;area+=triangleArea;
+                        if(triangleArea<.00001f)continue;
+                        var center=(a+b+c)/3;
+                        Assert.That(Geometry.Contains(polygon,new Position(center.x,0,center.z)),Is.EqualTo(id!="default-floor"),"Default coverage and the explicit L-shaped floor must be disjoint.");
+                    }
+                }
+                Assert.That(area,Is.EqualTo(id=="default-floor"?625:975).Within(.1));
+            }
+        }
+        [Test] public void MaximumCafeFloorHasBoundedSharedResourcesAndFitsCameraDepth()
+        {
+            PrepareSmallFloor();var layout=Layout("maximum-floor");layout.version=2;layout.room.width=1000;layout.room.depth=1000;
+            view=CreateView();view.Sync(layout,1);Assert.That(view.Unavailable,Is.Empty);
+            var filters=view.Camera.transform.parent.GetComponentsInChildren<MeshFilter>();
+            Assert.That(filters.Length,Is.InRange(1,8192));
+            Assert.That(filters.Select(f=>f.sharedMesh).Distinct().Count(),Is.LessThan(256));
+            Assert.That(view.ResourceBytes,Is.LessThan(32L*1024*1024));
+            var extent=new Bounds();bool first=true;
+            foreach(var filter in filters){var bounds=filter.GetComponent<Renderer>().bounds;if(first){extent=bounds;first=false;}else extent.Encapsulate(bounds);}
+            Assert.That(extent.min.x,Is.EqualTo(-500).Within(.001));Assert.That(extent.max.x,Is.EqualTo(500).Within(.001));
+            Assert.That(extent.min.z,Is.EqualTo(-500).Within(.001));Assert.That(extent.max.z,Is.EqualTo(500).Within(.001));
+            foreach(var point in Geometry.Extent(layout.room)) {
+                float depth=view.Camera.transform.InverseTransformPoint(new Vector3(point.x,0,point.z)).z;
+                Assert.That(depth,Is.InRange(view.Camera.nearClipPlane,view.Camera.farClipPlane),"Room-fit camera must include the maximum valid cafe.");
+            }
+            var size=view.Camera.orthographicSize;view.Zoom(1);
+            Assert.That(view.Camera.orthographicSize,Is.GreaterThan(size),"Zooming out must not jump inward to the old small-cafe limit.");
+            layout.instances.Clear();view.Sync(layout,2);Assert.That(view.ResourceBytes,Is.Zero);
+        }
+        [Test] public void RepeatedFloorKeepsNativeUvsNormalsAndMaterialAssignments()
+        {
+            PrepareSmallFloor();var path=Path.Combine(directory,MeshFile);
+            File.WriteAllText(path,File.ReadAllText(path).Replace("{\"triangles\":[0,2,1,0,3,2]}","{\"triangles\":[0,2,1]},{\"triangles\":[0,3,2]}"));
+            var catalog=pack.Catalog;var first=catalog.items[0].parts[0].materials[0];
+            var second=new MaterialSpec{name="Second floor material",color=new[]{1f,0f,0f,1f},textureScale=new[]{1f,1f},textureOffset=new[]{0f,0f}};
+            catalog.items[0].parts[0].materials=new[]{first,second};File.WriteAllText(Path.Combine(directory,"catalog.json"),JsonUtility.ToJson(catalog));pack=Pack.Load(directory);
+            var source=File.ReadAllBytes(path);view=CreateView();var layout=Layout("materials-floor");layout.version=2;layout.room.width=40;layout.room.depth=40;view.Sync(layout,1);Assert.That(view.Unavailable,Is.Empty);
+            var filters=view.Camera.transform.parent.GetComponentsInChildren<MeshFilter>();
+            foreach(var filter in filters){Assert.That(filter.sharedMesh.subMeshCount,Is.EqualTo(2));Assert.That(filter.GetComponent<Renderer>().sharedMaterials.Select(m=>m.name),Is.EqualTo(new[]{"Fixture","Second floor material"}));}
+            var intact=filters.First(f=>{var b=f.GetComponent<Renderer>().bounds;return b.min.x>-19&&b.min.z>-19&&b.max.x<19&&b.max.z<19;}).sharedMesh;
+            var uv=intact.uv;var native=new[]{Vector2.zero,Vector2.right,Vector2.one,Vector2.up};
+            for(int i=0;i<uv.Length;i++)Assert.That(uv[i],Is.EqualTo(native[i%4]),"Every repeated tile must retain its original UV phase.");
+            foreach(var normal in intact.normals)Assert.That(Vector3.Distance(normal,Vector3.up),Is.LessThan(.00001f));
+            Assert.That(intact.GetIndexCount(0),Is.EqualTo(intact.GetIndexCount(1)));
+            CollectionAssert.AreEqual(source,File.ReadAllBytes(path));
+        }
+        [Test] public void FloorBudgetFailureReleasesAlreadyAllocatedSharedBlocks()
+        {
+            PrepareSmallFloor();view=CreateView(450000);var layout=Layout("over-budget-floor");layout.room.width=40;layout.room.depth=40;
+            // The first 32×32 prototype fits; the differently sized edge block
+            // does not. This must clean up both its shared mesh and renderers.
+            view.Sync(layout,1);Assert.That(view.Unavailable.Single().reason,Does.StartWith("RESOURCE_BUDGET:"));
+            Assert.That(view.ObjectCount,Is.Zero);Assert.That(view.MeshCount,Is.Zero);Assert.That(view.ResourceBytes,Is.Zero);
+            Assert.That(view.Camera.transform.parent.GetComponentsInChildren<MeshFilter>(),Is.Empty);
+        }
+        [Test] public void LargeCafeBackgroundRemainsBehindGeometryAndCaptureRestoresWallCamera()
+        {
+            var catalog=pack.Catalog;catalog.items[0].placement="background";File.WriteAllText(Path.Combine(directory,"catalog.json"),JsonUtility.ToJson(catalog));pack=Pack.Load(directory);
+            view=CreateView();var layout=Layout("background");layout.version=2;layout.room.width=1000;layout.room.depth=1000;view.Sync(layout,1);
+            var background=view.Camera.transform.parent.Cast<Transform>().Single(t=>t.name=="Runtime test fixture [background]");
+            void AssertDepth(){float depth=view.Camera.transform.InverseTransformPoint(background.position).z;Assert.That(depth,Is.LessThan(view.Camera.farClipPlane));foreach(var point in Geometry.Extent(layout.room))Assert.That(view.Camera.transform.InverseTransformPoint(new Vector3(point.x,0,point.z)).z,Is.LessThan(depth));}
+            AssertDepth();view.FocusWall("front");AssertDepth();view.Pan(new Vector2(11,-7));
+            var position=view.Camera.transform.position;var rotation=view.Camera.transform.rotation;var far=view.Camera.farClipPlane;var size=view.Camera.orthographicSize;
+            var depthBefore=view.Camera.transform.InverseTransformPoint(background.position).z;
+            view.Capture(Path.Combine(directory,"large-camera.png"),32,32);
+            Assert.That(view.Camera.transform.position,Is.EqualTo(position));Assert.That(view.Camera.transform.rotation,Is.EqualTo(rotation));Assert.That(view.Camera.farClipPlane,Is.EqualTo(far));Assert.That(view.Camera.orthographicSize,Is.EqualTo(size));
+            Assert.That(view.Camera.transform.InverseTransformPoint(background.position).z,Is.EqualTo(depthBefore).Within(.001));AssertDepth();
+        }
+        [Test] public void SimultaneousViewsDoNotChangeCapturedPixelsAndRestoreVisibility()
+        {
+            view=CreateView();view.Sync(Layout("isolated"),1);
+            string before=Path.Combine(directory,"before.png"),after=Path.Combine(directory,"after.png");
+            view.Capture(before,128,128);
+            using(var other=new RuntimeView(pack,512L*1024*1024,view.Camera.scene)) {
+                var competing=Layout("competing");competing.instances[0].position=new Position(1,0,0);other.Sync(competing,1);
+                view.Capture(after,128,128);
+                CollectionAssert.AreEqual(File.ReadAllBytes(before),File.ReadAllBytes(after),"Another view in the same scene/layer must not contaminate a capture.");
+                Assert.IsTrue(Resources.FindObjectsOfTypeAll<GameObject>().Single(g=>g.name=="Runtime test fixture [competing]").activeInHierarchy,"Visibility must be restored after render.");
+            }
+        }
+        [Test] public void PolygonFloorFittingPreservesOriginalMeshBytesAndClipsEveryRenderedVertex()
+        {
+            File.WriteAllText(Path.Combine(directory,MeshFile),"{\"vertices\":[-1,0,-1,1,0,-1,1,0,1,-1,0,1],\"normals\":[0,1,0,0,1,0,0,1,0,0,1,0],\"uv\":[0,0,1,0,1,1,0,1],\"submeshes\":[{\"triangles\":[0,2,1,0,3,2]}]}");
+            var source=File.ReadAllBytes(Path.Combine(directory,MeshFile));var catalog=pack.Catalog;var item=catalog.items[0];item.placement="flooring";item.bounds=new BoundsData{min=new[]{-1f,0f,-1f},max=new[]{1f,0f,1f}};item.parts[0].position=new[]{0f,0f,0f};File.WriteAllText(Path.Combine(directory,"catalog.json"),JsonUtility.ToJson(catalog));pack=Pack.Load(directory);
+            view=CreateView();var polygon=new[]{new Position(0,0,0),new Position(3,0,0),new Position(3,0,1),new Position(1,0,1),new Position(1,0,3),new Position(0,0,3)};
+            var layout=new Layout{version=2};layout.areas.Add(new Area{id="L",name="L",flooringId="fixture",vertices=polygon});view.Sync(layout,1);
+            Assert.IsEmpty(view.Unavailable);var go=Resources.FindObjectsOfTypeAll<GameObject>().Single(g=>g.name=="Runtime test fixture [area-floor:L]");int vertices=0;
+            foreach(var filter in go.GetComponentsInChildren<MeshFilter>()) foreach(var vertex in filter.sharedMesh.vertices) {vertices++;var world=filter.transform.TransformPoint(vertex);Assert.IsTrue(Geometry.Contains(polygon,new Position(world.x,0,world.z)),"Fitted floor vertex escaped polygon: "+world);}
+            Assert.Greater(vertices,0);CollectionAssert.AreEqual(source,File.ReadAllBytes(Path.Combine(directory,MeshFile)));
+        }
+        [Test] public void NearCoplanarOriginalSkirtRetainsBothTrianglesAtExtentBoundary()
+        {
+            // A source vertical skirt straddles the ideal grid plane by a few
+            // micrometres. Epsilon classification must not extrapolate intersections.
+            File.WriteAllText(Path.Combine(directory,MeshFile),"{\"vertices\":[0.300002,-0.3,0,0.2999995,0.3,0,0.300002,-0.3,-0.28,0.2999995,0.3,-0.28],\"normals\":[1,0,0,1,0,0,1,0,0,1,0,0],\"uv\":[0,0,1,0,0,1,1,1],\"submeshes\":[{\"triangles\":[0,1,2,1,3,2]}]}");
+            var catalog=pack.Catalog;var item=catalog.items[0];item.placement="flooring";item.bounds=new BoundsData{min=new[]{-.3f,-.28f,-.3f},max=new[]{.3f,0f,.3f}};
+            item.parts[0].position=new[]{0f,0f,0f};item.parts[0].rotation=new[]{-.70710678f,0f,0f,.70710678f};
+            File.WriteAllText(Path.Combine(directory,"catalog.json"),JsonUtility.ToJson(catalog));pack=Pack.Load(directory);
+            view=CreateView();var layout=Layout("skirt");layout.version=2;layout.room=new Room{width=.6f,depth=.6f,grid=.6f};view.Sync(layout,1);Assert.IsEmpty(view.Unavailable);
+            var go=Resources.FindObjectsOfTypeAll<GameObject>().Single(g=>g.name=="Runtime test fixture [skirt]");float area=0;
+            foreach(var filter in go.GetComponentsInChildren<MeshFilter>()) {var vertices=filter.sharedMesh.vertices;var indices=filter.sharedMesh.triangles;for(int n=0;n<indices.Length;n+=3){var a=filter.transform.TransformPoint(vertices[indices[n]]);var b=filter.transform.TransformPoint(vertices[indices[n+1]]);var c=filter.transform.TransformPoint(vertices[indices[n+2]]);area+=Vector3.Cross(b-a,c-a).magnitude/2;Assert.GreaterOrEqual(a.y,-.28001f);Assert.LessOrEqual(a.y,.00001f);}}
+            Assert.That(area,Is.EqualTo(.6f*.28f).Within(.00001f),"Clipping cannot drop half a native boundary skirt or create extrapolated hanging triangles.");
+        }
+        [Test] public void DisposedViewCannotChangeAnotherCaptureInTheSameFrame()
+        {
+            view=CreateView();view.Sync(Layout("survivor"),1);string before=Path.Combine(directory,"dispose-before.png"),after=Path.Combine(directory,"dispose-after.png");view.Capture(before,128,128);
+            var retired=new RuntimeView(pack,512L*1024*1024,view.Camera.scene);var competing=Layout("retired");competing.instances[0].position=new Position(1,0,0);retired.Sync(competing,1);
+            var retiredObject=Resources.FindObjectsOfTypeAll<GameObject>().Single(g=>g.name=="Runtime test fixture [retired]");retired.Dispose();
+            Assert.IsTrue(!retiredObject || !retiredObject.activeInHierarchy,"Pending destruction must immediately remove a retired view from rendering.");
+            view.Capture(after,128,128);CollectionAssert.AreEqual(File.ReadAllBytes(before),File.ReadAllBytes(after));
+        }
         [Test] public void MoveRetainsObjectAndNativeGeometryWhileDeleteReleasesSharedResources()
         {
             view = CreateView(); var layout = Layout("one", "two"); view.Sync(layout, 1);

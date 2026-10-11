@@ -21,14 +21,24 @@ def main():
     except subprocess.TimeoutExpired:
         parser.exit(1, "Unity CLI status timed out; inspect the running Editor before retrying.\n")
     try:
-        instances = json.loads(status.stdout).get("data", {}).get("instances", [])
+        payload = json.loads(status.stdout)
+        data = payload.get("data") if isinstance(payload, dict) else None
+        instances = data.get("instances") if isinstance(data, dict) else None
+        if not isinstance(instances, list) or any(not isinstance(item, dict) for item in instances):
+            raise ValueError("Invalid Editor inventory")
+        errors = payload.get("errors")
+        no_instances = (status.returncode == 1 and payload.get("success") is False
+                        and data.get("count") == 0 and instances == []
+                        and isinstance(errors, list) and len(errors) == 1
+                        and isinstance(errors[0], dict) and errors[0].get("code") == "STATUS_NO_INSTANCES")
+        ready_inventory = status.returncode == 0 and payload.get("success") is True
+        if not (ready_inventory or no_instances):
+            raise ValueError("Unity CLI status failed")
     except (ValueError, AttributeError):
-        instances = []
+        parser.exit(1, "Unity CLI could not inspect live Editors; refusing to start a duplicate.\n")
     if any(Path(item.get("project", "")).resolve() == project for item in instances):
         return subprocess.call(["unity", "command", "menu", "--project-path", str(project),
                                 "--caller", "plugin", "--skill", "unity-cli", "--path", "Window/BlueCafe/Designer"], cwd=project)
-    if status.returncode != 0:
-        parser.exit(1, "Unity CLI could not inspect live Editors; refusing to start a duplicate.\n")
     version_text = (project / "ProjectSettings/ProjectVersion.txt").read_text()
     version = next(line.split(":", 1)[1].strip() for line in version_text.splitlines() if line.startswith("m_EditorVersion:"))
     editor_path = args.editor_path or os.environ.get("UNITY_EDITOR_PATH")

@@ -45,6 +45,26 @@ namespace BlueCafe.Infrastructure.Tests
             Assert.AreEqual(saved.cafeId, updated.cafeId); Assert.AreEqual(1, store.ListCafes().Length);
             Assert.IsTrue(Copies.Equal(initial, store.LoadCafe(saved.cafeId))); Assert.AreEqual("original-instance-id", updated.layout.instances[0].instanceId);
         }
+        [Test] public void RenamePreservesSavedIdentityAndTransformsAcrossReopen()
+        {
+            var original = Layout(); var saved = store.SaveCafe(original);
+            var renamed = store.RenameCafe(saved.cafeId, "  New cafe name  ");
+            original.name = "New cafe name";
+            Assert.AreEqual(saved.cafeId, renamed.cafeId);
+            Assert.AreEqual(1, store.ListCafes().Length);
+            Assert.IsTrue(Copies.Equal(original, new DocumentStore(root).LoadCafe(saved.cafeId)));
+        }
+        [Test] public void RejectedRenameKeepsBothSavedRecordsByteExact()
+        {
+            var first = store.SaveCafe(Layout("First")); var second = store.SaveCafe(Layout("Second"));
+            string path = Path.Combine(root, "cafes", first.cafeId + ".json");
+            string other = Path.Combine(root, "cafes", second.cafeId + ".json");
+            byte[] prior = File.ReadAllBytes(path), otherPrior = File.ReadAllBytes(other);
+            Assert.AreEqual("NAME_COLLISION", Assert.Throws<DocumentException>(() => store.RenameCafe(first.cafeId, "second")).Code);
+            Assert.AreEqual("NAME_REQUIRED", Assert.Throws<DocumentException>(() => store.RenameCafe(first.cafeId, " ")).Code);
+            CollectionAssert.AreEqual(prior, File.ReadAllBytes(path));
+            CollectionAssert.AreEqual(otherPrior, File.ReadAllBytes(other));
+        }
         [Test] public void ExtensionMetadataDoesNotAcquireInstanceRequirements()
         {
             string json = DocumentStore.SerializeLayout(Layout()).Replace("\"quarterTurns\": 3", "\"quarterTurns\": 3, \"observations\": [{\"position\": 7, \"instanceId\": 123, \"quarterTurns\": 0.5}]");
@@ -93,6 +113,95 @@ namespace BlueCafe.Infrastructure.Tests
             Assert.AreEqual(newId, store.LoadRecovery().documentId);
             File.WriteAllText(Path.Combine(root, "automatic-recovery.json"), "{truncated");
             Assert.IsNull(new DocumentStore(root).LoadRecovery());
+        }
+        static Layout EmptyLayout() => new Layout { name = "Unsaved initial", instances = new System.Collections.Generic.List<Instance>() };
+        [Test] public void FirstStartupCreatesOneSavedEmptyDefaultWithoutMutatingInputOrPackPath()
+        {
+            store.SaveSettings(new Settings { packRoot = "/local/prepared-pack" });
+            var empty = EmptyLayout(); var record = store.EnsureDefaultCafe(empty);
+            Assert.AreEqual("Unsaved initial", empty.name);
+            Assert.AreEqual("Empty room", record.name); Assert.AreEqual(0, record.layout.instances.Count);
+            var settings = store.LoadSettings();
+            Assert.AreEqual(record.cafeId, settings.defaultCafeId); Assert.AreEqual(record.cafeId, settings.emptyCafeId);
+            Assert.AreEqual("/local/prepared-pack", settings.packRoot);
+            Assert.AreEqual(1, store.ListCafes().Length);
+        }
+        [Test] public void ReopeningDefaultPreservesIdentityAndSavedChangesWithoutWritingAgain()
+        {
+            var first = store.EnsureDefaultCafe(EmptyLayout());
+            var edited = Layout("My starter edited"); store.SaveCafe(edited, first.cafeId);
+            string settingsPath = Path.Combine(root, "settings.json"), cafePath = Path.Combine(root, "cafes", first.cafeId + ".json");
+            byte[] settings = File.ReadAllBytes(settingsPath), cafeBytes = File.ReadAllBytes(cafePath);
+            var reopened = new DocumentStore(root).EnsureDefaultCafe(EmptyLayout());
+            Assert.AreEqual(first.cafeId, reopened.cafeId); Assert.IsTrue(Copies.Equal(edited, reopened.layout));
+            CollectionAssert.AreEqual(settings, File.ReadAllBytes(settingsPath)); CollectionAssert.AreEqual(cafeBytes, File.ReadAllBytes(cafePath));
+            Assert.AreEqual(1, store.ListCafes().Length);
+        }
+        [Test] public void ChosenSavedCafeIsTheDefaultAndMissingChoiceFallsBackToTrackedStarter()
+        {
+            var starter = store.EnsureDefaultCafe(EmptyLayout()); var chosen = store.SaveCafe(Layout("Chosen cafe"));
+            var settings = store.LoadSettings(); settings.packRoot = "/custom/pack"; settings.defaultCafeId = chosen.cafeId; store.SaveSettings(settings);
+            Assert.AreEqual(chosen.cafeId, new DocumentStore(root).EnsureDefaultCafe(EmptyLayout()).cafeId);
+            Assert.AreEqual(2, store.ListCafes().Length);
+            store.RenameCafe(starter.cafeId, "Starter renamed"); store.DeleteCafe(chosen.cafeId);
+            var fallback = new DocumentStore(root).EnsureDefaultCafe(EmptyLayout());
+            Assert.AreEqual(starter.cafeId, fallback.cafeId); Assert.AreEqual("Starter renamed", fallback.name);
+            Assert.AreEqual(starter.cafeId, store.LoadSettings().defaultCafeId); Assert.AreEqual("/custom/pack", store.LoadSettings().packRoot);
+            Assert.AreEqual(1, store.ListCafes().Length);
+        }
+        [Test] public void DefaultCreationCannotOverwriteAnExistingCafeNamedEmptyRoom()
+        {
+            var existing = store.SaveCafe(Layout("Empty room"));
+            string path = Path.Combine(root, "cafes", existing.cafeId + ".json"); byte[] before = File.ReadAllBytes(path);
+            var starter = store.EnsureDefaultCafe(EmptyLayout());
+            Assert.AreNotEqual(existing.cafeId, starter.cafeId); Assert.AreEqual("Empty room (2)", starter.name);
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(path)); Assert.AreEqual(2, store.ListCafes().Length);
+            Assert.AreEqual(starter.cafeId, new DocumentStore(root).EnsureDefaultCafe(EmptyLayout()).cafeId);
+        }
+        [Test] public void OldVersionOneSettingsGainStartupIdentityAndKeepPackPath()
+        {
+            Directory.CreateDirectory(root); File.WriteAllText(Path.Combine(root, "settings.json"), "{\"version\":1,\"packRoot\":\"/old/prepared-pack\"}");
+            Assert.IsTrue(string.IsNullOrEmpty(store.LoadSettings().defaultCafeId));
+            var starter = store.EnsureDefaultCafe(EmptyLayout()); var settings = new DocumentStore(root).LoadSettings();
+            Assert.AreEqual(1, settings.version); Assert.AreEqual("/old/prepared-pack", settings.packRoot);
+            Assert.AreEqual(starter.cafeId, settings.defaultCafeId); Assert.AreEqual(starter.cafeId, settings.emptyCafeId);
+        }
+        [Test] public void DeletedStarterCreatesNewIdentityAndRepairsDefault()
+        {
+            var first = store.EnsureDefaultCafe(EmptyLayout()); store.DeleteCafe(first.cafeId);
+            var replacement = new DocumentStore(root).EnsureDefaultCafe(EmptyLayout());
+            Assert.AreNotEqual(first.cafeId, replacement.cafeId); Assert.AreEqual("Empty room", replacement.name);
+            Assert.AreEqual(replacement.cafeId, store.LoadSettings().defaultCafeId);
+            Assert.AreEqual(replacement.cafeId, store.LoadSettings().emptyCafeId);
+            Assert.AreEqual(1, store.ListCafes().Length);
+        }
+        [Test] public void StarterPreservesOriginalFloorAndWallStylesWithoutAddingFurniture()
+        {
+            var original = EmptyLayout();
+            original.instances.Add(new Instance { instanceId = "starter-floor", furnitureId = "1", position = new Position(0, 0, 0) });
+            original.instances.Add(new Instance { instanceId = "starter-wall", furnitureId = "2", position = new Position(0, 0, 0) });
+            var record = store.EnsureDefaultCafe(original);
+            Assert.AreEqual("Empty room", record.name); Assert.AreEqual(2, record.layout.instances.Count);
+            var expected = Copies.Copy(original); expected.name = "Empty room";
+            Assert.IsTrue(Copies.Equal(expected, record.layout));
+            Assert.IsTrue(Copies.Equal(expected, new DocumentStore(root).EnsureDefaultCafe(EmptyLayout()).layout));
+            Assert.AreEqual("Unsaved initial", original.name);
+        }
+        [Test] public void CorruptSelectedDefaultIsReportedWithoutReplacingItOrChangingSettings()
+        {
+            var starter = store.EnsureDefaultCafe(EmptyLayout()); var chosen = store.SaveCafe(Layout("Chosen cafe"));
+            var settings = store.LoadSettings(); settings.defaultCafeId = chosen.cafeId; store.SaveSettings(settings);
+            string settingsPath = Path.Combine(root, "settings.json"), chosenPath = Path.Combine(root, "cafes", chosen.cafeId + ".json");
+            File.WriteAllText(chosenPath, "{truncated"); byte[] before = File.ReadAllBytes(settingsPath), corrupt = File.ReadAllBytes(chosenPath);
+            Assert.Throws<FormatException>(() => new DocumentStore(root).EnsureDefaultCafe(EmptyLayout()));
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(settingsPath)); CollectionAssert.AreEqual(corrupt, File.ReadAllBytes(chosenPath));
+            Assert.AreEqual(2, Directory.GetFiles(Path.Combine(root, "cafes"), "*.json").Length);
+            Assert.AreEqual(starter.cafeId, store.LoadSettings().emptyCafeId);
+        }
+        [Test] public void InvalidStarterCannotWriteStartupSettingsOrSavedCafe()
+        {
+            Assert.AreEqual("EMPTY_LAYOUT_REQUIRED", Assert.Throws<DocumentException>(() => store.EnsureDefaultCafe(Layout())).Code);
+            Assert.IsFalse(Directory.Exists(root));
         }
         [Test] public void SettingsUseAppDataWithoutEnteringPortableLayouts()
         {

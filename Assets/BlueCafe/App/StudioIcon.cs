@@ -27,7 +27,8 @@ namespace BlueCafe.App
                 case "settings": Circle(p,12,12,3); Circle(p,12,12,7); for(int i=0;i<8;i++) { float a=i*Mathf.PI/4; Line(p,V(12+7*Mathf.Cos(a),12+7*Mathf.Sin(a)),V(12+10*Mathf.Cos(a),12+10*Mathf.Sin(a))); } break;
                 case "search": Circle(p,10,10,6); Line(p,V(15,15),V(21,21)); break;
                 case "question": p.BeginPath(); p.MoveTo(V(8,8)); p.BezierCurveTo(V(8,3),V(17,3),V(17,8)); p.BezierCurveTo(V(17,11),V(12,11),V(12,15)); p.Stroke(); Circle(p,12,19,.5f); break;
-                case "check": case "verify": Line(p,V(5,12),V(10,17),V(20,6)); break;
+                case "check": Line(p,V(5,12),V(10,17),V(20,6)); break;
+                case "verify": Line(p,V(12,2),V(21,6),V(20,14),V(17,19),V(12,22),V(7,19),V(4,14),V(3,6),V(12,2)); Line(p,V(8,12),V(11,15),V(17,8)); break;
                 case "unsaved": Circle(p,12,12,4); break;
                 case "undo": case "redo": case "rotate": { bool redo=k=="redo" || k=="rotate"; float X(float x)=>redo?24-x:x; p.BeginPath(); p.MoveTo(V(X(19),18)); p.BezierCurveTo(V(X(25),7),V(X(9),4),V(X(5),10)); p.Stroke(); Line(p,V(X(5),5),V(X(5),11),V(X(11),11)); break; }
                 case "save": Rect(p,4,3,16,18); Rect(p,8,3,8,7); Rect(p,7,14,10,7); break;

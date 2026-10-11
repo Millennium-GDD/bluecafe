@@ -130,7 +130,7 @@ namespace BlueCafe.Unity
             if (placementPreview)
             {
                 foreach (var renderer in placementPreview.GetComponentsInChildren<Renderer>()) framingHelpers.Remove(renderer);
-                RuntimeResources.Release(placementPreview);
+                ReleaseFitted(placementPreview); RuntimeResources.Release(placementPreview);
             }
             placementPreview = null;
             placementPreviewInstance = null;

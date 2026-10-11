@@ -1,0 +1,8 @@
+{
+  "name": "BlueCafe.Agent.Tests",
+  "rootNamespace": "BlueCafe.Agent.Tests",
+  "references": ["BlueCafe.Core", "BlueCafe.Agent"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

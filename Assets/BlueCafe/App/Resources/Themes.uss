@@ -1,0 +1,65 @@
+.studio, .studio-theme-host {
+    --text: #14224d;
+    --secondary: #486382;
+    --surface: #f7fbff;
+    --panel: #f5faff;
+    --soft: #eaf3fc;
+    --input: #eff7ff;
+    --hover: #e1efff;
+    --selected: #dceeff;
+    --text-selection: rgba(50, 132, 220, 0.28);
+    --line: #b9d2e8;
+    --line-strong: #8aaccb;
+    --accent: #1269ce;
+    --accent-hover: #0756b6;
+    --accent-text: #0756b6;
+    --on-accent: #ffffff;
+    --disabled: #637993;
+    --disabled-surface: #e8eff5;
+    --success: #14724f;
+    --error: #a52635;
+    --warning: #9d4c26;
+    --error-surface: #fff0f0;
+    --canvas: #e4f3ff;
+    --knob: #ffffff;
+}
+.studio.theme-dark, .studio-theme-host.theme-dark {
+    --text: #e3edf8;
+    --secondary: #a9bdd4;
+    --surface: #142133;
+    --panel: #192b40;
+    --soft: #20364e;
+    --input: #1c3047;
+    --hover: #2b4864;
+    --selected: #214e77;
+    --text-selection: rgba(102, 174, 246, 0.32);
+    --line: #3b5670;
+    --line-strong: #688aac;
+    --accent: #266fbe;
+    --accent-hover: #337dcc;
+    --accent-text: #91c8ff;
+    --on-accent: #ffffff;
+    --disabled: #8b9eb3;
+    --disabled-surface: #233245;
+    --success: #7bdfb4;
+    --error: #ff9ca6;
+    --warning: #ffc391;
+    --error-surface: #4b2631;
+    --canvas: #162a3c;
+    --knob: #ffffff;
+}
+
+.studio .unity-button.primary, .studio .build-segments .unity-button.active, .studio .preset-tabs .unity-button.active, .studio .rooms-mode-switch .unity-button.active { background-color: var(--accent); color: var(--on-accent); }
+.studio .unity-button.primary:hover, .studio .unity-button.primary:focus { background-color: var(--accent-hover); color: var(--on-accent); }
+.studio .unity-button:disabled { background-color: var(--disabled-surface); color: var(--disabled); }
+.studio .unity-base-text-field__input, .studio .unity-base-popup-field__input { background-color: var(--input); color: var(--text); }
+.studio .unity-toggle__checkmark { background-color: var(--input); }
+.studio .build-cafe-toggle .build-switch-on .unity-toggle__checkmark { background-color: var(--accent); }
+.studio .build-cafe-toggle .build-switch-knob { background-color: var(--knob); }
+.studio .rooms-error { background-color: var(--error-surface); color: var(--error); }
+.studio .card:focus, .studio .build-interior-choice:focus { border-width: 2px; border-color: var(--accent-text); }
+.studio .canvas-column { background-color: var(--canvas); }
+.studio-dropdown-menu .unity-base-dropdown__item:disabled { color: var(--disabled); }
+.studio .unity-base-popup-field__arrow, .studio .unity-foldout__checkmark { -unity-background-image-tint-color: var(--secondary); }
+
+.studio .unity-base-field__label, .studio-theme-host .unity-base-field__label { color: var(--text); }

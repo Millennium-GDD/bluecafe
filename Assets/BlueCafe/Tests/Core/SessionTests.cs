@@ -204,7 +204,7 @@ namespace BlueCafe.Core.Tests
             UnchangedFailure(() => session.Replace(replacement), "OFF_GRID");
             replacement = session.Layout; replacement.instances[0].position.y = float.NaN;
             UnchangedFailure(() => session.Replace(replacement), "INVALID_TRANSFORM");
-            replacement = session.Layout; replacement.version = 2;
+            replacement = session.Layout; replacement.version = 3;
             UnchangedFailure(() => session.Replace(replacement), "INVALID_LAYOUT");
             replacement = session.Layout; replacement.room.width = 1;
             replacement.instances[0].furnitureId = "wide";

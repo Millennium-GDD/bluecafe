@@ -1,0 +1,18 @@
+.build-canvas { overflow: hidden; }
+.build-overlay { overflow: hidden; }
+.panel-divider { width: 6px; flex-shrink: 0; background-color: var(--line); }
+.panel-divider:hover, .panel-divider:focus { background-color: var(--blue); }
+.panel-edge-toggle { position: absolute; top: 52px; width: 25px; height: 42px; padding: 2px; margin: 0; background-color: var(--surface); border-color: var(--line); }
+.panel-edge-toggle > .icon-child { width: 20px; height: 24px; }
+.panel-edge-left { left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.panel-edge-right { right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.build-tools { height: auto; min-height: 46px; flex-wrap: wrap; max-width: 100%; }
+.build-floating-tools { max-width: 98%; }
+.build-floating-tools .toolbar-grip { width: 27px; margin: 0; padding: 2px; font-size: 21px; }
+.build-floating-tools #toolbarMinimize { width: 27px; padding: 2px; margin: 0; font-size: 18px; }
+.build-reset { height: 27px; margin: 4px 0 0; padding: 3px 7px; font-size: 11px; }
+.build-section > .unity-foldout__toggle { margin: 0 0 8px; min-height: 27px; }
+.build-section .unity-toggle__text { white-space: normal; font-size: 13px; }
+.build-section > .unity-foldout__content { margin-left: 0; }
+.card:focus, .build-interior-choice:focus, .unity-toggle:focus { border-width: 2px; border-color: var(--blue); }
+.command-result { height: 38px; -unity-text-align: middle-left; }

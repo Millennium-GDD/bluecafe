@@ -21,8 +21,8 @@ var id = BlueCafe.CafeApi.Place("1001", 0, 0); // use InspectCatalog to select e
 BlueCafe.CafeApi.Move(id, 1.2f, 0);
 BlueCafe.CafeApi.Rotate(id);
 BlueCafe.CafeApi.Duplicate(id);
-BlueCafe.CafeApi.Save("evidence/my-cafe.json");
-BlueCafe.CafeApi.Capture("evidence/my-cafe.png", 1600, 1200);
+BlueCafe.CafeApi.Save("output/my-cafe.json");
+BlueCafe.CafeApi.Capture("output/my-cafe.png", 1600, 1200);
 BlueCafe.CafeApi.ExportScene("Assets/BlueCafe/Exports/MyCafe.unity");
 ```
 
@@ -57,7 +57,7 @@ currently active scene. There are no ownership or comfort constraints.
 `BlueCafe.CafeReconstruction` provides additive Editor diagnostics. It leaves the
 version-1 layout format and creative placement rules unchanged. Orientation
 annotations are versioned derived observations in
-`docs/reconstruction/orientations.json`, separate from downloaded source content.
+a separately supplied local `docs/reconstruction/orientations.json` annotation file. It is omitted from the public repository along with source content and private captures.
 Audited local vectors use the assembled native prefab frame before placement yaw;
 an unknown front is never inferred from `Transform.forward`.
 
@@ -65,11 +65,11 @@ an unknown front is never inferred from `Transform.forward`.
 var annotations = BlueCafe.CafeReconstruction.LoadOrientations();
 var instance = BlueCafe.CafeReconstruction.InspectInstance(id);
 var pair = BlueCafe.CafeReconstruction.InspectPair(id, otherId);
-BlueCafe.CafeReconstruction.CaptureOrientationAtlas("11204", "evidence/desk-atlas.png");
-BlueCafe.CafeReconstruction.FreezeCameraProfile("evidence/camera.json", 1600, 1200);
-BlueCafe.CafeReconstruction.CaptureReference("evidence/frozen.png", "evidence/camera.json");
-var plan = BlueCafe.CafeReconstruction.LoadReferencePlan("evidence/reference-plan.json");
-BlueCafe.CafeReconstruction.CapturePlan("evidence/plan.png", plan);
+BlueCafe.CafeReconstruction.CaptureOrientationAtlas("11204", "output/desk-atlas.png");
+BlueCafe.CafeReconstruction.FreezeCameraProfile("output/camera.json", 1600, 1200);
+BlueCafe.CafeReconstruction.CaptureReference("output/frozen.png", "output/camera.json");
+var plan = BlueCafe.CafeReconstruction.LoadReferencePlan("output/reference-plan.json");
+BlueCafe.CafeReconstruction.CapturePlan("output/plan.png", plan);
 var audit = BlueCafe.CafeReconstruction.ValidateReconstruction(plan);
 BlueCafe.CafeApi.ValidateLayout(BlueCafe.CafeApi.Layout);
 ```
@@ -175,7 +175,7 @@ Original surfaces 210394, 22116, 19212, 23112, 23302, 23309, 15300, 22309,
 18304 and 23304 have derived static
 stencil render paths keyed to exact prefab, material and frame-mesh identity.
 Additional native state evidence for 39 original materials is retained in
-`evidence/core-reconstruction-stage2-2026-10-09/inventory-repair/special-surfaces/native-render-state.json`.
+private development diagnostics, which are excluded from this repository.
 Actual architectural frames determine wall centering. Original mask/scenery parts
 still rasterize and remain in full geometry bounds, but are excluded from visible
 framing and picking. All original parts remain retained, including both door leaf

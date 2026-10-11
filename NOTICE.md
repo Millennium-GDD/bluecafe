@@ -8,4 +8,4 @@ The included example layout JSON contains authored arrangements and stable furni
 
 Copyright in original code and documentation remains with the respective contributors. No project-wide source license has been selected. This notice does not grant a software license.
 
-`Assets/BlueCafe/App/Resources/StudioFont.ttf` is Noto Sans Regular. Its SIL Open Font License 1.1 license is included beside the font as `StudioFont-LICENSE.txt`; the alpha package includes the same license under `licenses/`. Unity dependencies and runtime libraries remain subject to Unity and package-specific terms.
+`Assets/BlueCafe/App/Resources/StudioFont.ttf` is Noto Sans Regular. Its SIL Open Font License 1.1 license is included beside the font as `StudioFont-LICENSE.txt`; the release packages include the same license under `licenses/`. Unity dependencies and runtime libraries remain subject to Unity and package-specific terms.

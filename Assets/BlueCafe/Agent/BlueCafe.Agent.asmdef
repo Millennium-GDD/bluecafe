@@ -1,1 +1,7 @@
-{"name":"BlueCafe.Agent","rootNamespace":"BlueCafe.Agent"}
+{
+  "name": "BlueCafe.Agent",
+  "rootNamespace": "BlueCafe.Agent",
+  "references": [
+    "BlueCafe.Core"
+  ]
+}

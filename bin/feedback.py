@@ -39,7 +39,7 @@ def compilation_ready(result, returncode):
     state = nested.get("result") if isinstance(nested, dict) else None
     if returncode != 0 or result.get("success") is not True or not isinstance(state, dict):
         return False
-    if state.get("status") != "completed" or state.get("compilationFailed") is not False:
+    if state.get("status") not in ("completed", "up_to_date") or state.get("compilationFailed") is not False:
         return False
     def unhealthy(value):
         if isinstance(value, dict):
