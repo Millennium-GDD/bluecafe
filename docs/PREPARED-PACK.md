@@ -10,4 +10,4 @@ Each part retains its original position, rotation, scale and material data. Mesh
 
 Use Settings to select or relink the pack. Catalog refresh validates references in the current layout and history before adoption. Known unavailable furniture may survive a saved layout; new placement requires available content. See `docs/CONTRACTS.md` for placement/document boundaries.
 
-The repository includes no downloaded catalog, game images, mesh data or acquisition scripts. Obtain and use content only under the permissions applicable to it.
+The repository includes a [local conversion tool](ASSET-CONVERSION.md), but no downloaded catalog, game images, mesh data or downloader. Obtain and use content only under the permissions applicable to it.

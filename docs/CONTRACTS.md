@@ -1,6 +1,6 @@
 # Integration contracts
 
-BlueCafe accepts separately supplied prepared packs under the user's applicable permissions. This repository contains the application, original source, licensed UI font and authored layout examples. It includes no game catalog, geometry, textures, thumbnails, reference captures or acquisition tools. See [the prepared-pack contract](PREPARED-PACK.md).
+BlueCafe accepts separately supplied prepared packs under the user's applicable permissions. This repository contains the application, original source, licensed UI font, authored layout examples and a local bundle conversion tool. It includes no game catalog, geometry, textures, thumbnails, reference captures or downloader. See [the prepared-pack contract](PREPARED-PACK.md) and [conversion guide](ASSET-CONVERSION.md).
 
 Core owns placement, validation, revisions, document history and atomic edits. Infrastructure verifies read-only packs and stores saved cafes/recovery atomically. Unity renders supplied original geometry. App UI and the local Agent bridge invoke the same Core operations; agents do not assemble independent scenes. The retained [Editor API](../Assets/BlueCafe/Editor/API.md) delegates validation to Core.
 
